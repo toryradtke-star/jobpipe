@@ -1,0 +1,33 @@
+{
+ "total": 11,
+ "jobPostings": [
+  {
+   "title": "Senior Product Designer",
+   "externalPath": "/job/Palo-Alto-HQ/Senior-Product-Designer_2026048",
+   "locationsText": "Palo Alto (HQ)",
+   "postedOn": "Posted 30+ Days Ago",
+   "bulletFields": [
+    "2026048"
+   ]
+  },
+  {
+   "title": "Senior / Principal Brand Designer",
+   "externalPath": "/job/Palo-Alto-HQ/Senior-Brand-Designer_2026039",
+   "locationsText": "Palo Alto (HQ)",
+   "postedOn": "Posted 10 Days Ago",
+   "bulletFields": [
+    "2026039"
+   ]
+  },
+  {
+   "title": "Social Media Content Creator (Contract)",
+   "externalPath": "/job/Palo-Alto-HQ/Social-Media-Content-Creator--Contract-_2026041",
+   "locationsText": "Palo Alto (HQ)",
+   "postedOn": "Posted 30+ Days Ago",
+   "bulletFields": [
+    "2026041"
+   ]
+  }
+ ],
+ "userAuthenticated": false
+}

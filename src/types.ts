@@ -10,7 +10,7 @@ export type Posting = {
   /** `${ats}:${slug}:${externalId}` — stable across polls, the primary key. */
   id: string;
   ats: Ats;
-  /** The board slug we polled, e.g. "vercel". */
+  /** The board slug we polled, e.g. "vercel", or "tenant|wd5|site" for Workday. */
   slug: string;
   /** The employer's display name, from the registry rather than the feed. */
   company: string;
@@ -35,7 +35,7 @@ export type Posting = {
   lastSeen: string;
 };
 
-export type Ats = 'greenhouse' | 'ashby' | 'lever';
+export type Ats = 'greenhouse' | 'ashby' | 'lever' | 'workday';
 
 /** One employer's board, as the registry lists it. */
 export type Company = {
@@ -44,6 +44,11 @@ export type Company = {
   slug: string;
   /** Free-form labels for filtering polls, e.g. ["saas", "devtools"]. */
   tags?: string[];
+  /**
+   * Search terms for boards too big to read whole (Workday). Each term is one
+   * search; the union of hits is what gets fetched. Defaults per adapter.
+   */
+  search?: string[];
 };
 
 /** The outcome of the deterministic screen. */

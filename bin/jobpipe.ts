@@ -30,10 +30,20 @@ const env = (name: string) => process.env[`JOBPIPE_${name}`] ?? process.env[`JOB
 const DB_PATH = env('DB') ?? join(ROOT, 'data', 'jobpipe.db');
 const PROFILE_DIR = env('PROFILE') ?? join(ROOT, 'profile');
 const REGISTRY = env('REGISTRY') ?? join(ROOT, 'companies.json');
+const BULK_REGISTRY = env('BULK_REGISTRY') ?? join(ROOT, 'data', 'companies-bulk.json');
 const TRACKER = env('TRACKER') ?? join(homedir(), 'job-search', 'applications.csv');
 
+/**
+ * The curated registry, plus the bulk one when `--bulk` is passed. Bulk is
+ * the tens of thousands of boards scripts/import-slugs.ts probed alive; too
+ * many to poll every run, worth a sweep now and then.
+ */
 function companies(): Company[] {
-  return JSON.parse(readFileSync(REGISTRY, 'utf8')) as Company[];
+  const list = JSON.parse(readFileSync(REGISTRY, 'utf8')) as Company[];
+  if (has('bulk') && existsSync(BULK_REGISTRY)) list.push(...JSON.parse(readFileSync(BULK_REGISTRY, 'utf8')) as Company[]);
+  const ats = flag('ats')?.split(',');
+  const tag = flag('tag');
+  return list.filter((c) => (!ats || ats.includes(c.ats)) && (!tag || (c.tags ?? []).includes(tag)));
 }
 
 function profile(): Profile {
@@ -70,10 +80,7 @@ async function cmdVerify(): Promise<void> {
 
 async function cmdPoll(): Promise<void> {
   const store = new Store(DB_PATH);
-  const list = companies().filter((c) => {
-    const tag = flag('tag');
-    return !tag || (c.tags ?? []).includes(tag);
-  });
+  const list = companies();
   const startedAt = new Date().toISOString();
   console.log(`Polling ${list.length} boards…`);
   let ok = 0, failed = 0, seen = 0, added = 0;
@@ -82,6 +89,7 @@ async function cmdPoll(): Promise<void> {
     concurrency: Number(flag('concurrency', '4')),
     onResult: (r) => {
       if (r.ok) { ok++; } else { failed++; errors.push(`${r.company.ats}:${r.company.slug} ${r.error}`); }
+      if (list.length > 200 && (ok + failed) % 200 === 0) console.log(`  ${ok + failed}/${list.length} boards…`);
     },
   });
   for (const r of results) {
@@ -92,7 +100,8 @@ async function cmdPoll(): Promise<void> {
   store.db.prepare(`INSERT INTO polls (started_at, finished_at, boards_ok, boards_failed, postings_seen, postings_new, errors)
     VALUES (?,?,?,?,?,?,?)`).run(startedAt, new Date().toISOString(), ok, failed, seen, added, JSON.stringify(errors));
   console.log(`${ok}/${list.length} boards answered. ${seen} postings seen, ${added} new.`);
-  for (const e of errors) console.log(`  failed: ${e}`);
+  for (const e of errors.slice(0, 30)) console.log(`  failed: ${e}`);
+  if (errors.length > 30) console.log(`  …and ${errors.length - 30} more (polls table has them all)`);
   store.close();
 }
 
@@ -262,12 +271,13 @@ const command = process.argv[2];
 if (!command || !COMMANDS[command]) {
   console.log(`jobpipe — find, judge and track job postings
 
-  jobpipe poll    [--tag saas] [--concurrency 4]   fetch every board, store what is new
+  jobpipe poll    [--bulk] [--ats workday] [--tag saas] [--concurrency 4]
+                                                   fetch every board, store what is new
   jobpipe screen  [--all]                          apply the deterministic rule-outs
   jobpipe judge   [--limit 20] [--model NAME]      send survivors to Claude
   jobpipe report  [--out PATH]                     write the triage markdown
   jobpipe stats                                    what the store holds
-  jobpipe verify                                   check every board still answers
+  jobpipe verify  [--bulk] [--ats A]               check every board still answers
   jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT] [--status S]
   jobpipe import-csv [--from PATH]                 load the tracker CSV into the store
   jobpipe export-csv [--out PATH]                  write applications back out as CSV

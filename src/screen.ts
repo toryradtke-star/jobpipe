@@ -58,22 +58,32 @@ const NO_BASE = /\b(commission[- ]only|100% commission|uncapped commission only|
 const HARD_DEGREE = /\b(bachelor'?s?|b\.?s\.?|master'?s?|m\.?s\.?|ph\.?d\.?|degree)\b[^.\n]{0,80}\b(computer science|software engineering|electrical engineering|mathematics|statistics)\b/i;
 const DEGREE_SOFTENED = /\b(or equivalent|in lieu of|equivalent (?:practical |hands-on |work |professional )?experience|degree (?:is )?(?:not required|preferred but)|no degree|or relevant experience|or comparable)\b/i;
 
-export function screenPosting(p: Posting, rules: Rules = DEFAULT_RULES): Screen {
+/**
+ * The rules that read nothing but the title. Split out so a board that costs a
+ * request per description (Workday) can skip fetching ones the screen would
+ * throw away on the title alone.
+ */
+export function titleReasons(title: string, rules: Rules = DEFAULT_RULES): string[] {
   const reasons: string[] = [];
-  const title = p.title;
-  const where = `${p.location ?? ''}`;
-  const text = `${p.title}\n${where}\n${p.description}`;
-  const head = p.description.slice(0, 4_000);
-
   // Level. The title is the reliable signal. A hard senior word settles it
   // outright; a soft one ("lead", "manager", "architect") can be taken back by
   // a junior marker in the same title.
   if (HARD_SENIOR.test(title)) reasons.push('too-senior');
   else if (rules.tooSenior.test(title) && !JUNIOR_MARKER.test(title)) reasons.push('too-senior');
-
-  if (INTERNSHIP.test(title) || INTERNSHIP.test(head)) reasons.push('internship');
+  if (INTERNSHIP.test(title)) reasons.push('internship');
   if (rules.wrongFunction.test(title)) reasons.push('wrong-function');
   if (rules.deepSpecialist.test(title)) reasons.push('deep-specialist');
+  return reasons;
+}
+
+export function screenPosting(p: Posting, rules: Rules = DEFAULT_RULES): Screen {
+  const title = p.title;
+  const where = `${p.location ?? ''}`;
+  const text = `${p.title}\n${where}\n${p.description}`;
+  const head = p.description.slice(0, 4_000);
+
+  const reasons = titleReasons(title, rules);
+  if (!reasons.includes('internship') && INTERNSHIP.test(head)) reasons.push('internship');
   if (CLEARANCE.test(text)) reasons.push('clearance');
   if (NO_BASE.test(text)) reasons.push('no-base-pay');
 
