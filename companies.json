@@ -579,5 +579,62 @@
       "ecommerce",
       "martech"
     ]
+  },
+  {
+    "name": "Himalayas",
+    "ats": "himalayas",
+    "slug": "us",
+    "tags": [
+      "feed",
+      "remote"
+    ],
+    "search": [
+      "GTM engineer",
+      "growth engineer",
+      "marketing engineer",
+      "AI automation",
+      "marketing automation",
+      "marketing operations",
+      "marketing technologist",
+      "solutions engineer",
+      "developer advocate",
+      "web developer"
+    ]
+  },
+  {
+    "name": "Remotive",
+    "ats": "remotive",
+    "slug": "all",
+    "tags": [
+      "feed",
+      "remote"
+    ],
+    "search": [
+      "marketing",
+      "software-dev"
+    ]
+  },
+  {
+    "name": "RemoteOK",
+    "ats": "remoteok",
+    "slug": "all",
+    "tags": [
+      "feed",
+      "remote"
+    ]
+  },
+  {
+    "name": "We Work Remotely",
+    "ats": "wwr",
+    "slug": "all",
+    "tags": [
+      "feed",
+      "remote"
+    ],
+    "search": [
+      "remote-sales-and-marketing-jobs",
+      "remote-full-stack-programming-jobs",
+      "remote-front-end-programming-jobs"
+    ]
   }
 ]

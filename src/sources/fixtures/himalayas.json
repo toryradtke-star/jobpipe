@@ -1,0 +1,233 @@
+{
+ "comments": "21/08/2026: Cursor pagination is now available and is the preferred way to page through the feed. Pass the nextCursor value from each response back as ?cursor=. It is faster than offset and will never return the same job twice. The offset parameter is deprecated and will be removed in a future release. 13/03/2026: The API has been updated to include the companySlug field in the response.",
+ "updatedAt": 1790817751,
+ "offset": 0,
+ "limit": 20,
+ "totalCount": 50,
+ "jobs": [
+  {
+   "title": "GTM Engineer",
+   "excerpt": "About NetVendorNetVendor is the leading solution for property management professionals seeking to simplify vendor relationships and streamline maintenance operations.",
+   "companyName": "NetVendor",
+   "companySlug": "netvendor",
+   "companyLogo": "https://cdn-images.himalayas.app/mean64ch3xt91v606tj6yfk0kaae",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Mid-level"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "GTM-Engineering",
+    "Revenue-Operations",
+    "RevOps-Systems",
+    "Technical-Sales-Engineering",
+    "Go-To-Market-Engineering",
+    "GTM-Engineer",
+    "GTM-Systems-Engineer",
+    "GTM-AI-Engineer",
+    "GTM-Automation-Engineer",
+    "AI-GTM-Engineer",
+    "GTM-Architect",
+    "GTM-Systems-Engineering"
+   ],
+   "parentCategories": [
+    "Sales"
+   ],
+   "description": "<h3>About <a href=\"https://himalayas.app/companies/netvendor\">NetVendor</a>\n</h3><p><a href=\"https://himalayas.app/companies/netvendor\">NetVendor</a> is the leading solution for property management professionals seeking to simplify vendor relationships and streamline maintenance operations. Our comprehensive suite of software products empowers clients to ensure vendor compliance, optimize maintenance operations, and facilitate seamless bidding, all with a commitment to professionalism, precision, and trust.</p><h3>About the Role</h3><p><a href=\"https://himalayas.app/companies/netvendor\">NetVendor</a> is looking for a hands-on, company-first, GTM Engineer to architect and build the technology ecosystem that powers our go-to-market organization.</p><p><a href=\"https://himalayas.app/companies/netvendor\">NetVendor</a> has built a leading position in property management, and we\u2019re continuing to raise the bar on how our organization operates as we scale that leadership and pursue new opportunities. The GTM Engineer will play a key role in that next chapter, creating the technical capabilities that generate leverage across our revenue organization.</p><p>We\u2019re looking for a modern GTM architect and hands-on builder who can turn business strategy into elegant, scalable technical solutions. You\u2019ll bring expertise across HubSpot and the broader GTM technology ecosystem to enable our teams, accelerate execution, and help us deliver even more value to the market. The GTM Engineer will report to the Director of RevOps and will work closely with GTM leadership.</p><h3>What You\u2019ll Do</h3><ul>\n<li>Architect and elevate our GTM systems ecosystem, with HubSpot at the center, translating GTM and RevOps strategy into scalable technical architecture across the full customer lifecycle.</li>\n<li>Connect our GTM technology and data, integrating platforms such as Clay, Apollo, OnRamp, and internal <a href=\"https://himalayas.app/companies/netvendor\">NetVendor</a> data to create seamless workflows and a trusted source of truth.</li>\n<li>Build automation, AI agents, and AI-enabled workflows that eliminate manual work, accelerate execution, and create measurable leverage across our revenue organization.</li>\n<li>Explore and prototype emerging GTM technologies, bringing new ideas from concept to production when they can meaningfully improve how our teams operate.</li>\n<li>Build the data infrastructure that reliably powers segmentation, routing, workflows, forecasting &amp; predictability, reporting, and enables decision-making.</li>\n<li>Develop scalable reporting and analytics infrastructure, translating RevOps requirements into trusted dashboards, scorecards, and funnel &amp; lifecycle reporting.</li>\n<li>Continuously improve and document what we build, creating solutions that are scalable, transparent, maintainable, and adopted by the teams they support.</li>\n</ul><h3>What We're Looking For</h3><ul>\n<li>4+ years of relevant experience in GTM Engineering, Revenue Operations, GTM Systems, or a related technical operations role.</li>\n<li>Deep hands-on HubSpot expertise paired with experience across modern GTM technologies such as Clay, Apollo, or comparable platforms.</li>\n<li>Strong technical integration experience, including APIs, webhooks, native integrations, middleware, and connecting internal and external data.</li>\n<li>Hands-on experience building automation, AI agents, and AI-enabled workflows, with demonstrated examples of applying AI to solve real business problems.</li>\n<li>Strong GTM and technical judgment, with the ability to translate business needs into scalable solutions, evaluate technical approaches and tradeoffs, and communicate effectively across technical and business teams.</li>\n</ul><h3>\n<a href=\"https://himalayas.app/companies/netvendor\">NetVendor</a> Benefits Package</h3><ul>\n<li>Medical, dental, and vision insurance</li>\n<li>HSA, FSA, and DCFSA</li>\n<li>Long- and short-term disability insurance</li>\n<li>Company-paid standard life insurance</li>\n<li>Generous paid time off policy</li>\n<li>Paid holidays: 7 per year + 1 floating holiday</li>\n<li>Maternity Leave</li>\n<li>401(k) with company match</li>\n<li>Employee Assistance Program</li>\n</ul><p><a href=\"https://himalayas.app/companies/netvendor\">NetVendor</a> is an equal opportunity employer. We are committed to building a diverse and inclusive workplace where everyone can thrive. All qualified applicants will receive consideration for employment without regard to race, color, religion, national origin, gender, pregnancy or related conditions, sexual orientation, gender identity or expression, age, disability, genetic information, veteran status, or any other characteristic protected by federal, state, or local laws.</p><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1789913975,
+   "expiryDate": 1795097974,
+   "applicationLink": "https://himalayas.app/companies/netvendor/jobs/gtm-engineer",
+   "guid": "https://himalayas.app/companies/netvendor/jobs/gtm-engineer"
+  },
+  {
+   "title": "(Senior) GTM-Engineer (m/w/d)",
+   "excerpt": "deine aufgabenDu m\u00f6chtest Verantwortung \u00fcbernehmen, echte Wirkung erzielen und die Zukunft moderner GTM-Prozesse mitgestalten?",
+   "companyName": "Boardwise",
+   "companySlug": "boardwise",
+   "companyLogo": "https://cdn-images.himalayas.app/4k13f0x52yw9bphjcbd31gsapu2f",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": null,
+   "locationRestrictions": [],
+   "timezoneRestrictions": [
+    -11,
+    -10,
+    -9.5,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    -4,
+    -3.5,
+    -3,
+    -2,
+    -1,
+    0,
+    1,
+    2,
+    3,
+    3.5,
+    4,
+    4.5,
+    5,
+    5.5,
+    5.75,
+    6,
+    6.5,
+    7,
+    8,
+    8.75,
+    9,
+    9.5,
+    10,
+    10.5,
+    11,
+    12,
+    12.75,
+    13,
+    14
+   ],
+   "categories": [
+    "GTM-Engineering",
+    "Growth-Engineering",
+    "Rev-Ops",
+    "Marketing-Automation",
+    "B2B-Marketing",
+    "GTM-Engineer",
+    "GTM-Automation-Engineer",
+    "GTM-Systems-Engineer",
+    "Senior-Go-To-Market-Engineer",
+    "GTM-AI-Engineer",
+    "AI-GTM-Engineer"
+   ],
+   "parentCategories": [],
+   "description": "<h3>deine aufgaben</h3><p>Du m\u00f6chtest Verantwortung \u00fcbernehmen, echte Wirkung erzielen und die Zukunft moderner GTM-Prozesse mitgestalten? Dann bist Du bei uns genau richtig. <br>Als (Senior) GTM-Engineer (m/w/d) baust und skalierst Du unsere moderne B2B GTM Engine. Du verbindest Daten, Signale, Automatisierung und AI, um GTM-Prozesse in skalierbare Systeme zu \u00fcbersetzen und damit direkten Impact auf Pipeline und Revenue zu schaffen. <br></p><ul>\n<li>Signale \u2192 Trigger:BuyingSignals identifizieren und in automatisierte GTM-Aktionen \u00fcbersetzen</li>\n<li>Enrichment &amp; Scoring:Account- und Contact-Daten automatisiert anreichern, ICP Fit &amp; Intent bewerten</li>\n<li>Personalized Campaigns: Hochgradig personalisierte Outbound-Kampagnen daten- und signalbasiert automatisieren</li>\n<li>Lead Routing: Leads und Accounts anhand von Fit, Intent und Engagement intelligent priorisieren und routen</li>\n<li>CRM-Automation:Workflows und Datenfl\u00fcsse zwischen CRM und unserem GTM-Stack aufbauen</li>\n<li>GTM Infrastructure:Automationen mitClay, n8n, APIs und Webhooks entwickeln und skalieren</li>\n<li>Experimente schnell umsetzen, messen und erfolgreiche Ans\u00e4tze systematisieren</li>\n</ul><p></p><h3>dein profil</h3><p></p><ul>\n<li>Du hast eine vergleichbare GTM-Infrastruktur bereits selbst aufgebaut</li>\n<li>Mehrj\u00e4hrige Erfahrung in GTM-Engineering, Growth Engineering,RevOps oder einem vergleichbaren B2B-Umfeld</li>\n<li>Sehr gute Erfahrung mit Clay, n8n und modernen GTM-Tools</li>\n<li>Technisches Verst\u00e4ndnis f\u00fcr APIs, Webhooks, Datenstrukturen und CRM-Systeme</li>\n<li>Erfahrung mit Enrichment, Scoring, Routing und automatisierten Kampagnen</li>\n<li>Starkes kommerzielles Verst\u00e4ndnis: Du optimierst nicht f\u00fcr \u201emehr Automatisierung\u201c, sondern f\u00fcr Pipeline, Conversion und Revenue</li>\n<li>Sehr gute deutsch und englisch Kenntnisse </li>\n</ul><p></p><h3>warum wir?</h3><p></p><ul>\n<li>100 %Remote: Arbeite von \u00fcberall in Europa, mit Vertrauen, Flexibilit\u00e4t und Ownership.</li>\n<li>Wachstumschancen:Entwickle Dich fachlich und pers\u00f6nlich weiter und \u00fcbernimm mit wachsender Verantwortung eine zentrale Rolle in unserem GTM.</li>\n<li>Direkter Business Impact: Deine Arbeit wirkt unmittelbar auf Pipeline,Conversion und Revenue.</li>\n<li>Modernstes GTM-Stack:Arbeite mit Clay, n8n, APIs, Webhooks und AI und gestalte unsere technische GTM-Infrastruktur aktiv mit.</li>\n</ul><p></p><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1789049801,
+   "expiryDate": 1794233801,
+   "applicationLink": "https://himalayas.app/companies/boardwise/jobs/senior-gtm-engineer-m-w-d",
+   "guid": "https://himalayas.app/companies/boardwise/jobs/senior-gtm-engineer-m-w-d"
+  },
+  {
+   "title": "GTM Engineer",
+   "excerpt": "About HuzzleAt Huzzle, we connect exceptional talents with top opportunities at leading companies across the UK, US, Canada, Europe, and Australia.",
+   "companyName": "Huzzle",
+   "companySlug": "huzzle",
+   "companyLogo": "https://cdn-images.himalayas.app/9lc6nafazoy08dhh3b539jxnxt0y",
+   "employmentType": "Contractor",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Mid-level"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "GTM-Engineer",
+    "Revenue-Operations",
+    "Sales-Operations",
+    "GTM-Strategy",
+    "Outbound-Sales",
+    "B2B-Sales",
+    "Sales",
+    "GTM-Systems-Engineer",
+    "GTM-AI-Engineer",
+    "GTM-Automation-Engineer",
+    "AI-GTM-Engineer",
+    "GTM-Architect",
+    "GTM-Engineering",
+    "GTM-Systems-Engineering"
+   ],
+   "parentCategories": [
+    "Sales"
+   ],
+   "description": "<h3>About <a href=\"https://himalayas.app/companies/huzzle\">Huzzle</a>\n</h3><p>At <a href=\"https://himalayas.app/companies/huzzle\">Huzzle</a>, we connect exceptional talents with top opportunities at leading companies across the UK, US, Canada, Europe, and Australia. Our clients include startups, digital agencies, and tech platforms across industries such as SaaS, MarTech, FinTech, and EdTech.</p><p>Unlike an outsourcing agency, we place you directly with a client where you\u2019re hired in-house as a valued member of their team. This means you work closely with internal teams, contribute to meaningful projects, and have real opportunities for career growth.</p><h3>Role Type: Full-time</h3><h3>Engagement: Independent Contractor </h3><h3>Job Summary</h3><p>Our client is a fast-growing AI-first B2B growth agency that helps high-growth tech companies scale revenue through AI-powered Revenue Operations, automated outbound systems, and growth infrastructure.</p><p>They work with venture-backed startups and scaling B2B SaaS companies, implementing end-to-end GTM systems, sales automation, and data-driven outbound strategies.</p><p>Since launching, the company has grown from $0 to $2M ARR in under a year while working with some of the fastest-growing startups backed by leading venture capital firms and accelerators.</p><p>We are looking for a GTM Engineer to help design and implement scalable Revenue Operations systems, outbound infrastructure, and automation workflows for high-growth B2B SaaS companies.</p><p>In this role, you will work at the intersection of RevOps, outbound growth, data infrastructure, and AI-powered automation. You will collaborate with founders, sales leaders, and RevOps teams to design and execute modern go-to-market strategies.</p><h3>Key Responsibilities</h3><h3>GTM Strategy &amp; Play Design</h3><ul>\n<li> Recommend and implement <strong>outbound GTM plays</strong> tailored to each client\u2019s ICP and growth stage </li>\n<li> Advise clients on <strong>sales tech stack selection and automation tools</strong>\n</li>\n<li> Build <strong>lead allocation systems</strong> to distribute prospects across sales teams efficiently </li>\n</ul><h3>TAM Mapping &amp; Data Infrastructure</h3><ul>\n<li> Build ICP models using firmographic, technographic, and behavioral signals </li>\n<li> Map Total Addressable Markets (TAM) and prioritize high-value accounts </li>\n<li> Implement signal tracking systems using first-party and third-party data sources </li>\n<li> Identify decision-makers and buying committee members within target accounts</li>\n</ul><h3>Clay &amp; Data Enrichment</h3><ul>\n<li> Build advanced Clay workflows for data enrichment and account research </li>\n<li> Implement AI-driven enrichment pipelines to automate manual research </li>\n<li> Create automation workflows using tools such as Clay, APIs, and workflow automation platforms </li>\n<li> Develop account scoring systems to prioritize high-intent prospects </li>\n</ul><h3>Outbound Campaign Development</h3><ul>\n<li> Build personalized multi-channel outbound campaigns across email and LinkedIn </li>\n<li> Create scalable outbound sequences while maintaining personalization </li>\n<li> Analyze campaign performance and iterate based on results and client feedback </li>\n</ul><h3>Client Communication &amp; Collaboration</h3><ul>\n<li> Participate in weekly client calls to discuss strategy and performance </li>\n<li> Collaborate internally using Notion, Slack, and documentation tools </li>\n<li> Contribute to internal GTM playbooks and process documentation </li>\n<li> Deliver performance reports and growth recommendations </li>\n</ul><h3>Requirements</h3><h3>Must Have</h3><ul>\n<li> 2 - 4+ years of experience in Sales, RevOps, Sales Operations, BizOps, or GTM Engineering </li>\n<li> Experience working in B2B SaaS, startups, or agencies </li>\n<li> Strong working knowledge of Clay </li>\n<li> Curiosity about AI tools, automation, and growth experimentation </li>\n<li> Strong problem-solving mindset and ability to learn quickly </li>\n<li> Fluent English communication skills </li>\n</ul><h3>Nice to Have</h3><ul>\n<li> Experience with HubSpot or Salesforce CRM systems </li>\n<li> Experience with workflow automation tools such as n8n </li>\n<li> Experience working with sales automation or outbound tooling </li>\n</ul><h3>Benefits</h3><p>\ud83d\udcbb Fully Remote: Work from anywhere with international teams</p><p>\ud83d\ude80 Career Growth: Join companies in SaaS, MarTech, and B2B services</p><p>\ud83e\udd1d Peer Community: Connect with high-performing sales professionals in our network</p><p>\ud83e\udded Ongoing Support: Receive guidance from <a href=\"https://himalayas.app/companies/huzzle\">Huzzle</a> before and after placement</p><p>\ud83d\udcb0 Tailored Compensation: Salaries vary by client and candidate preference \u2014 we\u2019ll match you with options that fit your goals</p><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1789718398,
+   "expiryDate": 1794902397,
+   "applicationLink": "https://himalayas.app/companies/huzzle/jobs/gtm-engineer-4514462923",
+   "guid": "https://himalayas.app/companies/huzzle/jobs/gtm-engineer-4514462923"
+  },
+  {
+   "title": "GTM Engineer",
+   "excerpt": "About the RolePopmenu is hiring its first GTM Engineer to build the systems that power our go-to-market motion.",
+   "companyName": "Popmenu",
+   "companySlug": "popmenu-com",
+   "companyLogo": "https://cdn-images.himalayas.app/osyim65fatcayng5ldh4vpek30xq",
+   "employmentType": "Full Time",
+   "minSalary": 140000,
+   "maxSalary": 150000,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "GTM-Engineering",
+    "Revenue-Operations",
+    "Sales-Engineering",
+    "Sales-Operations",
+    "Marketing-Operations",
+    "GTM-Engineer",
+    "GTM-Systems-Engineer",
+    "GTM-AI-Engineer",
+    "GTM-Automation-Engineer",
+    "AI-GTM-Engineer",
+    "GTM-Architect",
+    "GTM-Systems-Engineering"
+   ],
+   "parentCategories": [
+    "Sales",
+    "Marketing"
+   ],
+   "description": "<h3>About the Role</h3><p><a href=\"https://himalayas.app/companies/popmenu-com\">Popmenu</a> is hiring its first GTM Engineer to build the systems that power our go-to-market motion. This is a build role. You will design those systems from the ground up and have real latitude in deciding what gets built first.</p><p>We run a high-velocity, low-ACV motion: thousands of addressable restaurants in every market we sell into, and a sales cycle typically under 30 days. Our Sales, Marketing and CX teams run well on processes they have built and refined themselves. What they do not have yet are the systems to take that repetitive work off them, orchestrate the handoffs between them, and put the right accounts in front of the right person automatically. Building those systems is how we intend to have the sharpest, most efficient go-to-market motion in restaurant technology.</p><p>You will report to our Chief Business Officer and Co-Founder and work across Sales, Marketing and CX. Salesforce and Salesloft are our system of record and sequencing today, and the data, enrichment and automation around them is largely yours to build. Nobody hands you a backlog here. You will find where we are losing hours and where we are losing accounts, decide what matters most, and build the fix.</p><h3>What You'll Own</h3><h3>Pipeline and Targeting</h3><ul>\n<li>A single source of truth for every addressable restaurant in our markets, US and UK, assigned to territory automatically, enriched, and scored on fit and intent</li>\n<li>An AI-native outbound engine that turns cold restaurants into booked conversations, at a volume no team could run manually</li>\n<li>The infrastructure that makes that volume possible: domain strategy, inbox rotation, warmup and sender reputation</li>\n<li>Inbound speed to lead, plus routing and attribution in partnership with Marketing</li>\n</ul><h3>Sales Productivity</h3><ul>\n<li>Take the repetitive work off our AEs: list building, account research, call prep, follow-up, routing and data entry</li>\n<li>Put reps in front of prioritized, signal-ranked queues instead of a blank search bar</li>\n</ul><h3>CX and Post-Sale Efficiency</h3><ul>\n<li>Bring the same leverage to onboarding, support workflows and account health scoring</li>\n<li>Orchestrate the handoffs between Sales, Marketing and CX so nothing is rekeyed, re-researched or dropped between teams</li>\n<li>Automate the good processes that are still being run manually, without breaking what already works</li>\n</ul><h3>Systems, Stack and Roadmap</h3><ul>\n<li>Own the architecture of how our GTM tools connect, and the quality of the data inside them</li>\n<li>Own what you build end to end, including monitoring, error handling, and the guardrails on anything AI-generated that reaches a restaurant</li>\n<li>Know our stack, know what exists in the market that we are not yet using, and make the case for what we adopt, replace or retire</li>\n<li>Set the roadmap and bring a clear, defensible point of view on what gets built first</li>\n<li>Measure the impact: repetitive hours removed across Sales and CX, territory coverage and data accuracy, booked conversations generated, and speed to lead</li>\n</ul><h3>Requirements</h3><h3>What We're Looking For</h3><h3>Non-Negotiables</h3><ul>\n<li>5+ years in GTM engineering, revenue operations, growth or marketing operations, including time owning a function rather than a slice of one</li>\n<li>Self-directed by default. You can point to problems you identified yourself, decided were worth solving, and drove to completion</li>\n<li>Strong SQL and working Python or equivalent. You can connect two systems with no native integration</li>\n<li>AI in production. You have shipped AI-driven workflows that reach real customers, and you can explain your evals, guardrails and human-review step before anything goes out</li>\n<li>CRM architecture rather than administration. Salesforce or HubSpot, plus modern enrichment and orchestration tooling: Clay, n8n, Make or equivalent</li>\n<li>Commercial instinct, and a track record of shipping work with teams you do not manage</li>\n</ul><h3>Strong Preference</h3><ul>\n<li>High-velocity, low-ACV motions. Cycles under 30 days and thousands of accounts per market</li>\n<li>Restaurant tech, hospitality SaaS, or vertical SaaS</li>\n<li>Local business or multi-location data</li>\n<li>Experience building without a large team, in a startup or scale-up environment</li>\n</ul><h3>Who You Are</h3><ul>\n<li>A builder, not a maintainer. You are energized by an open scope rather than unsettled by it</li>\n<li>Strategic without being asked. You bring a point of view on what should happen next and you can defend it</li>\n<li>Focused on leverage. You measure your work by the hours and errors you take out of other people's days</li>\n</ul><h3>Benefits</h3><p></p><p><strong>Who We Are</strong></p><p><strong><a href=\"https://himalayas.app/companies/popmenu-com\">Popmenu</a> is a fast-growing, venture-backed SaaS company transforming the restaurant industry. We started with our patented dynamic menu technology, unleashing the power of a restaurant's most important marketing tool, the menu. Since then, we have continued innovating to solve existing and emerging challenges for restaurant operators. We do not just sell software. We partner with restaurants to help them win. Our mission is to empower owners and operators with the technology tools they need to succeed long into the future. We hire exceptionally bright, motivated people who are passionate about helping great restaurants reach their full potential.</strong></p><h3><strong>Compensation</strong></h3><ul>\n<li><strong>Base: $140,000 to $150,000</strong></li>\n<li><strong>Annual bonus target: 20% of base </strong></li>\n<li><strong>Equity included for every employee</strong></li>\n</ul><h3><strong>Why <a href=\"https://himalayas.app/companies/popmenu-com\">Popmenu</a></strong></h3><ul>\n<li><strong>Our first GTM Engineer, with meaningful ownership of the function from day one</strong></li>\n<li><strong>A direct line to our Chief Business Officer and Co-Founder</strong></li>\n<li><strong>Full-funnel scope across Sales, Marketing and CX rather than one narrow slice</strong></li>\n<li><strong>Remote across the US, a product restaurants rely on, and equity for every team member</strong></li>\n</ul><h3><strong>What We're Serving</strong></h3><ul>\n<li><strong><strong>Remote, United States</strong></strong></li>\n<li><strong>Genuine Core Values with quarterly peer recognition through our Super Booms</strong></li>\n<li><strong>Giving Back with company donations to causes chosen by team members</strong></li>\n<li><strong>Visible Growth and Development in a scaling SaaS company where your impact is seen and rewarded</strong></li>\n<li><strong>Company Ownership with meaningful equity for every employee</strong></li>\n<li><strong>Comprehensive Benefits including medical, dental, vision, 401(k), and Wagmo Wellness Plan for your pets</strong></li>\n</ul><p>Originally posted on <a href=\"https://himalayas.app\">Himalayas</a></p>",
+   "pubDate": 1789612839,
+   "expiryDate": 1794796839,
+   "applicationLink": "https://himalayas.app/companies/popmenu-com/jobs/gtm-engineer",
+   "guid": "https://himalayas.app/companies/popmenu-com/jobs/gtm-engineer"
+  }
+ ]
+}

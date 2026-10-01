@@ -35,7 +35,9 @@ export type Posting = {
   lastSeen: string;
 };
 
-export type Ats = 'greenhouse' | 'ashby' | 'lever' | 'workday';
+export type Ats = 'greenhouse' | 'ashby' | 'lever' | 'workday'
+  // Multi-employer remote boards; see src/sources/remote-boards.ts.
+  | 'remotive' | 'remoteok' | 'himalayas' | 'wwr';
 
 /** One employer's board, as the registry lists it. */
 export type Company = {

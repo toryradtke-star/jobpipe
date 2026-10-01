@@ -16,13 +16,14 @@ import * as greenhouse from './greenhouse.ts';
 import * as ashby from './ashby.ts';
 import * as lever from './lever.ts';
 import * as workday from './workday.ts';
+import { remotive, remoteok, himalayas, wwr } from './remote-boards.ts';
 import { getJson, type FetchContext } from './http.ts';
 
 type Adapter =
   | { url(slug: string): string; parse(body: unknown, company: Company, now: string): Posting[] }
   | { fetch(company: Company, ctx: FetchContext): Promise<Posting[]> };
 
-const ADAPTERS: Record<Ats, Adapter> = { greenhouse, ashby, lever, workday };
+const ADAPTERS: Record<Ats, Adapter> = { greenhouse, ashby, lever, workday, remotive, remoteok, himalayas, wwr };
 
 export const SUPPORTED: Ats[] = Object.keys(ADAPTERS) as Ats[];
 
