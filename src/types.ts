@@ -62,6 +62,11 @@ export type Screen = {
   verdict: 'pass' | 'out';
   /** Which rules fired, by name. Empty on a pass. */
   reasons: string[];
+  /**
+   * Doubts that do not rule a posting out but that the judge should settle,
+   * by name — e.g. "us-not-stated" for a remote role that names no country.
+   */
+  flags: string[];
   screenedAt: string;
 };
 
@@ -73,6 +78,15 @@ export type Judgment = {
   reasoning: string;
   /** What the model thinks would block an application, if anything. */
   blockers: string[];
+  /** Overall 1–5, 5 best. Null on judgments made before scores existed. */
+  score: number | null;
+  /** role_fit, level, pay, remote, title_leverage — each 1–5. */
+  subscores: Record<string, number>;
+  /** What the description says about remote, read past the board's label. */
+  remoteTruth: 'us-remote' | 'state-restricted' | 'hybrid-or-onsite' | 'non-us' | 'unclear';
+  remoteEvidence: string;
+  ghostRisk: 'low' | 'medium' | 'high' | null;
+  ghostSignals: string[];
   judgedAt: string;
   model: string;
 };

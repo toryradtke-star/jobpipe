@@ -7,8 +7,9 @@
  * the whole reason this is worth building: the tool it replaces allows 75 full
  * judgments a month.
  *
- * The model is given the same three things a person would need — the rules,
- * the background, and the posting — and asked for one JSON object. Anything it
+ * The model is given what a person would need — the rules, the background,
+ * the posting, and what the pipeline knows about the posting's history — and
+ * asked for one JSON object. Anything it
  * says that is not parseable JSON is recorded as a failure rather than guessed
  * at, because a judgment nobody can read is worse than no judgment.
  */
@@ -19,7 +20,27 @@ import type { Judgment, Posting } from './types.ts';
 const run = promisify(execFile);
 
 /** How much of a description the model is shown. Whole postings are long. */
-const DESCRIPTION_CHARS = 9_000;
+const DESCRIPTION_CHARS = 16_000;
+
+/**
+ * What jobpipe already knows about a posting that the posting itself does not
+ * say: how old it is, whether it is still up, whether it keeps being reposted.
+ * Ghost-job signals the model cannot see from the text alone.
+ */
+export type Context = {
+  /** Days since the board says it was posted; null when the board does not say. */
+  ageDays: number | null;
+  /** Days since jobpipe first saw it. */
+  trackedDays: number;
+  /** Seen in the latest poll of its board. */
+  live: boolean;
+  /** Earlier postings at this employer with the same normalized title. */
+  reposts: number;
+  /** The screen's unresolved doubts, e.g. "us-not-stated". */
+  flags: string[];
+  /** "employer board" or the aggregator's name. */
+  source: string;
+};
 
 export type Profile = {
   /** The hard rule-outs, verbatim. */
@@ -28,7 +49,7 @@ export type Profile = {
   background: string;
 };
 
-function prompt(p: Posting, profile: Profile): string {
+function prompt(p: Posting, profile: Profile, ctx: Context): string {
   return `You are screening one job posting for a specific candidate. Be strict and be honest; a false positive wastes their day.
 
 ## The candidate's hard rule-outs
@@ -48,20 +69,34 @@ URL: ${p.url}
 
 ${p.description.slice(0, DESCRIPTION_CHARS)}
 
+## What the pipeline knows that the posting does not say
+- Source: ${ctx.source}
+- Age: ${ctx.ageDays === null ? 'the board gives no posting date' : `${ctx.ageDays} days since posted`}; tracked for ${ctx.trackedDays} days
+- Still listed in the latest poll: ${ctx.live ? 'yes' : 'NO — it may have closed'}
+- Earlier postings at this employer with the same title: ${ctx.reposts}
+- Screen flags to settle: ${ctx.flags.length ? ctx.flags.join(', ') : 'none'}${ctx.flags.includes('us-not-stated') ? ' (the posting is remote but never names a country — decide from the text whether US candidates are eligible)' : ''}
+
+## How to judge
+1. Remote truth. Job boards label roles "remote" that are not. Read the whole description for on-site days, relocation, a required metro, a state list, or timezone limits. Minnesota-based candidates fail a state list that leaves out MN. Quote the words that decide it.
+2. Ghost risk. A posting that is very old, no longer listed, reposted again and again, or written so generically that no team could be behind it is likely not being hired for.
+3. Title leverage. The same skills are paid ~$65k under marketing-coordinator titles and $120k+ under engineering-style GTM titles (GTM Engineer, Growth Engineer, Marketing Engineer, AI Automation Engineer). Score how far this title moves the candidate toward the engineering-style band.
+
 ## Your answer
 Reply with ONE JSON object and nothing else. No markdown fence, no commentary.
 
-{"rating":"STRONG|FAIR|WEAK|NO","reasoning":"one or two sentences quoting the posting where it matters","blockers":["short phrases naming anything that would block an application, [] if none"]}
+{"rating":"STRONG|FAIR|WEAK|NO","score":1,"subscores":{"role_fit":1,"level":1,"pay":1,"remote":1,"title_leverage":1},"remote_truth":"us-remote|state-restricted|hybrid-or-onsite|non-us|unclear","remote_evidence":"the deciding words, quoted","ghost_risk":"low|medium|high","ghost_signals":["short phrases, [] if none"],"reasoning":"one or two sentences quoting the posting where it matters","blockers":["short phrases naming anything that would block an application, [] if none"]}
+
+Scores are 1–5, 5 best. "pay" is 3 when pay is not stated. "score" is your overall call, not an average.
 
 Rating means:
-- STRONG: clears every hard rule-out and the work is what this candidate actually does.
-- FAIR: clears every hard rule-out, with a real gap worth naming.
-- WEAK: clears the hard rule-outs on a technicality, or the fit is thin.
-- NO: at least one hard rule-out fires. Name it in blockers.`;
+- STRONG (score 4–5): clears every hard rule-out and the work is what this candidate actually does.
+- FAIR (score 3–4): clears every hard rule-out, with a real gap worth naming.
+- WEAK (score 2): clears the hard rule-outs on a technicality, or the fit is thin.
+- NO (score 1): at least one hard rule-out fires, remote_truth is anything but us-remote or a state list including MN, or ghost_risk is high. Name it in blockers.`;
 }
 
 /** Pulls the first balanced JSON object out of a model's reply. */
-function extractJson(text: string): Record<string, any> | null {
+export function extractJson(text: string): Record<string, any> | null {
   const start = text.indexOf('{');
   if (start === -1) return null;
   let depth = 0;
@@ -83,13 +118,18 @@ function extractJson(text: string): Record<string, any> | null {
 
 const RATINGS = new Set(['STRONG', 'FAIR', 'WEAK', 'NO']);
 
+const REMOTE_TRUTH = new Set(['us-remote', 'state-restricted', 'hybrid-or-onsite', 'non-us', 'unclear']);
+const GHOST = new Set(['low', 'medium', 'high']);
+const clamp = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : null; };
+
 export async function judgePosting(
   p: Posting,
   profile: Profile,
+  ctx: Context,
   opts: { model?: string; timeoutMs?: number } = {},
 ): Promise<Judgment | { error: string; postingId: string }> {
   const model = opts.model ?? 'default';
-  const args = ['-p', prompt(p, profile)];
+  const args = ['-p', prompt(p, profile, ctx)];
   if (opts.model) args.push('--model', opts.model);
   try {
     const { stdout } = await run('claude', args, {
@@ -105,6 +145,13 @@ export async function judgePosting(
       rating: rating as Judgment['rating'],
       reasoning: String(parsed.reasoning ?? '').trim(),
       blockers: Array.isArray(parsed.blockers) ? parsed.blockers.map(String) : [],
+      score: clamp(parsed.score),
+      subscores: Object.fromEntries(Object.entries(parsed.subscores ?? {})
+        .map(([k, v]) => [k, clamp(v)]).filter(([, v]) => v !== null)) as Record<string, number>,
+      remoteTruth: REMOTE_TRUTH.has(parsed.remote_truth) ? parsed.remote_truth : 'unclear',
+      remoteEvidence: String(parsed.remote_evidence ?? '').trim(),
+      ghostRisk: GHOST.has(parsed.ghost_risk) ? parsed.ghost_risk : null,
+      ghostSignals: Array.isArray(parsed.ghost_signals) ? parsed.ghost_signals.map(String) : [],
       judgedAt: new Date().toISOString(),
       model,
     };

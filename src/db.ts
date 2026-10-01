@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS applications (
   notes TEXT
 );
 CREATE INDEX IF NOT EXISTS applications_posting ON applications(posting_id);
+
+-- Small facts the CLI remembers between runs, e.g. when the last report ran.
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS applications_company_role ON applications(company, role);
 `;
 
@@ -136,6 +139,15 @@ export class Store {
       this.db.exec('COMMIT');
     }
     this.db.exec('CREATE INDEX IF NOT EXISTS postings_fingerprint ON postings(fingerprint)');
+    const screenCols = new Set((this.db.prepare('PRAGMA table_info(screens)').all() as { name: string }[]).map((c) => c.name));
+    if (!screenCols.has('flags')) this.db.exec(`ALTER TABLE screens ADD COLUMN flags TEXT NOT NULL DEFAULT '[]'`);
+    const judgeCols = new Set((this.db.prepare('PRAGMA table_info(judgments)').all() as { name: string }[]).map((c) => c.name));
+    for (const [col, def] of [['score', 'INTEGER'], ['subscores', "TEXT NOT NULL DEFAULT '{}'"],
+      ['remote_truth', 'TEXT'], ['remote_evidence', 'TEXT'], ['ghost_risk', 'TEXT'],
+      ['ghost_signals', "TEXT NOT NULL DEFAULT '[]'"]] as const) {
+      if (!judgeCols.has(col)) this.db.exec(`ALTER TABLE judgments ADD COLUMN ${col} ${def}`);
+    }
+    this.db.exec('CREATE INDEX IF NOT EXISTS judgments_score ON judgments(score)');
   }
 
   /**
@@ -180,20 +192,27 @@ export class Store {
 
   putScreen(s: Screen): void {
     this.db.prepare(`
-      INSERT INTO screens (posting_id, verdict, reasons, screened_at) VALUES (?,?,?,?)
+      INSERT INTO screens (posting_id, verdict, reasons, flags, screened_at) VALUES (?,?,?,?,?)
       ON CONFLICT(posting_id) DO UPDATE SET
-        verdict = excluded.verdict, reasons = excluded.reasons, screened_at = excluded.screened_at
-    `).run(s.postingId, s.verdict, JSON.stringify(s.reasons), s.screenedAt);
+        verdict = excluded.verdict, reasons = excluded.reasons, flags = excluded.flags,
+        screened_at = excluded.screened_at
+    `).run(s.postingId, s.verdict, JSON.stringify(s.reasons), JSON.stringify(s.flags), s.screenedAt);
   }
 
   putJudgment(j: Judgment): void {
     this.db.prepare(`
-      INSERT INTO judgments (posting_id, rating, reasoning, blockers, judged_at, model)
-      VALUES (?,?,?,?,?,?)
+      INSERT INTO judgments (posting_id, rating, reasoning, blockers, judged_at, model,
+        score, subscores, remote_truth, remote_evidence, ghost_risk, ghost_signals)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(posting_id) DO UPDATE SET
         rating = excluded.rating, reasoning = excluded.reasoning,
-        blockers = excluded.blockers, judged_at = excluded.judged_at, model = excluded.model
-    `).run(j.postingId, j.rating, j.reasoning, JSON.stringify(j.blockers), j.judgedAt, j.model);
+        blockers = excluded.blockers, judged_at = excluded.judged_at, model = excluded.model,
+        score = excluded.score, subscores = excluded.subscores, remote_truth = excluded.remote_truth,
+        remote_evidence = excluded.remote_evidence, ghost_risk = excluded.ghost_risk,
+        ghost_signals = excluded.ghost_signals
+    `).run(j.postingId, j.rating, j.reasoning, JSON.stringify(j.blockers), j.judgedAt, j.model,
+      j.score, JSON.stringify(j.subscores), j.remoteTruth, j.remoteEvidence, j.ghostRisk,
+      JSON.stringify(j.ghostSignals));
   }
 
   /**
@@ -238,6 +257,57 @@ export class Store {
 
   markDuplicate(id: string): void {
     this.db.prepare(`UPDATE screens SET verdict = 'out', reasons = '["duplicate"]' WHERE posting_id = ?`).run(id);
+  }
+
+  /** The ghost-job facts the judge is handed alongside a posting. */
+  context(p: Posting): Omit<import('./judge.ts').Context, 'source'> {
+    const now = Date.now();
+    const days = (iso: string) => Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000));
+    const latest = this.db.prepare('SELECT MAX(last_seen) t FROM postings WHERE ats = ? AND slug = ?').get(p.ats, p.slug) as { t: string };
+    const fp = fingerprint(p.company, p.title);
+    const reposts = (this.db.prepare(`SELECT COUNT(*) n FROM postings WHERE fingerprint = ? AND id != ? AND first_seen < ?`)
+      .get(fp, p.id, p.firstSeen) as { n: number }).n;
+    const screen = this.db.prepare('SELECT flags FROM screens WHERE posting_id = ?').get(p.id) as { flags?: string } | undefined;
+    return {
+      ageDays: p.postedAt ? days(p.postedAt) : null,
+      trackedDays: days(p.firstSeen),
+      // Live means it was in the most recent poll of its board, within a day.
+      live: !latest?.t || Date.parse(latest.t) - Date.parse(p.lastSeen) < 86_400_000,
+      reposts,
+      flags: JSON.parse(screen?.flags ?? '[]'),
+    };
+  }
+
+  getMeta(key: string): string | null {
+    return (this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+  }
+
+  /**
+   * Judged postings worth a look and not yet applied to, best first. "Applied"
+   * matches by posting id, or by company + title for applications recorded
+   * from somewhere jobpipe never polled. Closed postings, high ghost risk and
+   * remote claims the judge did not believe are left out.
+   */
+  queue(limit: number): Record<string, any>[] {
+    const applied = new Set((this.db.prepare('SELECT company, role FROM applications').all() as Record<string, string>[])
+      .map((a) => fingerprint(a.company, a.role)));
+    const rows = this.query(`
+      SELECT p.*, j.rating, j.score, j.subscores, j.remote_truth, j.remote_evidence, j.ghost_risk, j.reasoning, j.blockers
+      FROM postings p JOIN judgments j ON j.posting_id = p.id
+      JOIN screens s ON s.posting_id = p.id AND s.verdict = 'pass'
+      WHERE j.rating IN ('STRONG','FAIR')
+        AND COALESCE(j.ghost_risk, 'low') != 'high'
+        AND COALESCE(j.remote_truth, 'us-remote') IN ('us-remote','state-restricted')
+        AND p.last_seen >= (SELECT datetime(MAX(last_seen), '-1 day') FROM postings q WHERE q.ats = p.ats AND q.slug = p.slug)
+        AND p.id NOT IN (SELECT posting_id FROM applications WHERE posting_id IS NOT NULL)
+      ORDER BY COALESCE(j.score, CASE j.rating WHEN 'STRONG' THEN 4 ELSE 3 END) DESC,
+               CASE j.rating WHEN 'STRONG' THEN 0 ELSE 1 END,
+               COALESCE(p.posted_at, p.first_seen) DESC`);
+    return rows.filter((r) => !applied.has(r.fingerprint)).slice(0, limit);
   }
 
   /** Postings with no screen verdict yet. */

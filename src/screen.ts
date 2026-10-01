@@ -95,8 +95,10 @@ export function screenPosting(p: Posting, rules: Rules = DEFAULT_RULES): Screen 
   const place = readPlace(p.location, p.description);
   if (!place.remote) reasons.push('not-remote');
   else if (place.officeDays) reasons.push('office-days-required');
+  const flags: string[] = [];
   if (place.elsewhere && !place.us) reasons.push('outside-us');
-  else if (!place.us && !place.elsewhere) reasons.push('us-not-stated');
+  // Silence about the country is not evidence of abroad. It goes to the judge.
+  else if (!place.us && !place.elsewhere) flags.push('us-not-stated');
 
   // Degree, only when the posting never softens it.
   if (HARD_DEGREE.test(head) && !DEGREE_SOFTENED.test(head)) reasons.push('hard-degree');
@@ -105,6 +107,7 @@ export function screenPosting(p: Posting, rules: Rules = DEFAULT_RULES): Screen 
     postingId: p.id,
     verdict: reasons.length ? 'out' : 'pass',
     reasons,
+    flags,
     screenedAt: new Date().toISOString(),
   };
 }

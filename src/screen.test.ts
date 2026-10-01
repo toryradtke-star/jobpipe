@@ -81,3 +81,17 @@ test('place reads the location field over the description', () => {
   assert.equal(readPlace('New York, NY (HQ)', 'Fully remote team.').remote, false);
   assert.equal(readPlace(null, 'This is a fully remote role in the United States.').remote, true);
 });
+
+test('a remote role that never names a country passes, flagged for the judge', () => {
+  // "us-not-stated" alone cut 161 postings in the 2026-09-22 run, most of them
+  // "Remote" with no country at all — a question for the judge, not a rule-out.
+  const s = screenPosting(posting({ location: 'Remote', description: 'Fully remote team.' }));
+  assert.equal(s.verdict, 'pass');
+  assert.deepEqual(s.reasons, []);
+  assert.deepEqual(s.flags, ['us-not-stated']);
+});
+
+test('a remote role placed outside the US is still ruled out', () => {
+  const s = screenPosting(posting({ location: 'Remote, Germany', description: 'Remote within Germany.' }));
+  assert.ok(s.reasons.includes('outside-us'));
+});

@@ -9,6 +9,7 @@
  *   screen   apply the deterministic rule-outs to everything unscreened
  *   judge    send survivors to Claude, newest first
  *   report   write the triage markdown
+ *   queue    the next few postings worth applying to
  *   stats    what the store holds right now
  *   applied     record an application against a posting
  *   import-csv  load ~/job-search/applications.csv into the store
@@ -22,7 +23,7 @@ import { Store, APPLICATION_COLUMNS } from '../src/db.ts';
 import { detectEol, parseCsvRecords, toCsv } from '../src/csv.ts';
 import { fetchAll, probe } from '../src/sources/index.ts';
 import { screenPosting } from '../src/screen.ts';
-import { fingerprint, preferred } from '../src/dedupe.ts';
+import { fingerprint, preferred, SOURCE_RANK } from '../src/dedupe.ts';
 import { judgePosting, type Profile } from '../src/judge.ts';
 import type { Company, Posting } from '../src/types.ts';
 
@@ -117,6 +118,7 @@ function cmdScreen(): void {
   if (!pending.length) { console.log('Nothing to screen.'); store.close(); return; }
   const tally = new Map<string, number>();
   const touched = new Set<string>();
+  const flagged = new Map<string, number>();
   let passed = 0;
   for (const raw of pending) {
     const p = has('all') ? rehydrate(raw as any) : raw;
@@ -125,6 +127,7 @@ function cmdScreen(): void {
     store.putScreen(s);
     if (s.verdict === 'pass') passed++;
     for (const r of s.reasons) tally.set(r, (tally.get(r) ?? 0) + 1);
+    if (s.verdict === 'pass') for (const f of s.flags) flagged.set(f, (flagged.get(f) ?? 0) + 1);
   }
   // Dedupe last, among copies that passed everything else, so the copy kept
   // is one that can actually be applied to. The judge then reads each job once.
@@ -138,6 +141,7 @@ function cmdScreen(): void {
   for (const [reason, n] of [...tally].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${String(n).padStart(5)}  ${reason}`);
   }
+  for (const [f, n] of flagged) console.log(`  passed with a flag for the judge: ${n} ${f}`);
   store.close();
 }
 
@@ -162,45 +166,83 @@ async function cmdJudge(): Promise<void> {
   const pending = [...queue];
   await Promise.all(Array.from({ length: Math.min(concurrency, pending.length) }, async () => {
     for (let p = pending.shift(); p; p = pending.shift()) {
-      const r = await judgePosting(p, prof, model ? { model } : {});
+      const source = SOURCE_RANK[p.ats] === 0 ? `employer board (${p.ats})` : `aggregator (${p.ats})`;
+      const r = await judgePosting(p, prof, { ...store.context(p), source }, model ? { model } : {});
       done++;
       if ('error' in r) { console.log(`  [${done}/${queue.length}] FAILED ${p.company} — ${p.title}: ${r.error}`); continue; }
       store.putJudgment(r);
       counts.set(r.rating, (counts.get(r.rating) ?? 0) + 1);
-      console.log(`  [${done}/${queue.length}] ${r.rating.padEnd(6)} ${p.company} — ${p.title}`);
+      const ghost = r.ghostRisk && r.ghostRisk !== 'low' ? ` ghost:${r.ghostRisk}` : '';
+      console.log(`  [${done}/${queue.length}] ${r.rating.padEnd(6)} ${r.score ?? '?'}/5 ${r.remoteTruth}${ghost}  ${p.company} — ${p.title}`);
     }
   }));
   console.log([...counts].map(([k, v]) => `${k} ${v}`).join(', '));
   store.close();
 }
 
+/** One posting as a report entry. */
+function entry(r: Record<string, any>): string[] {
+  const blockers = JSON.parse(r.blockers ?? '[]') as string[];
+  const sub = JSON.parse(r.subscores ?? '{}') as Record<string, number>;
+  const subLine = Object.keys(sub).length ? ` · ${Object.entries(sub).map(([k, v]) => `${k.replace('_', ' ')} ${v}`).join(', ')}` : '';
+  const ghost = r.ghost_risk && r.ghost_risk !== 'low' ? ` · ⚠ ghost risk ${r.ghost_risk}` : '';
+  const out = [`### ${r.closed ? '~~' : ''}${r.company} — ${r.title}${r.closed ? `~~ (gone from the board since ${String(r.last_seen).slice(0, 10)})` : ''}`,
+    `**${r.score ? `${r.score}/5 ` : ''}${r.rating}** · **${money(r.salary_min)}–${money(r.salary_max)}** · ${r.location ?? 'location not stated'} · posted ${String(r.posted_at ?? '').slice(0, 10) || 'unknown'} · ${r.ats}${ghost}`];
+  if (r.remote_truth) out.push(`Remote: ${r.remote_truth}${r.remote_evidence ? ` — ${r.remote_evidence}` : ''}`);
+  out.push(r.reasoning + (subLine ? `\n<sub>${subLine.slice(3)}</sub>` : ''));
+  if (blockers.length) out.push(`Blockers: ${blockers.join('; ')}`);
+  out.push(`\`${r.id}\` · <${r.url}>`, '');
+  return out;
+}
+
 function cmdReport(): void {
   const store = new Store(DB_PATH);
   const rows = store.query(`
-    SELECT p.*, j.rating, j.reasoning, j.blockers
+    SELECT p.*, j.rating, j.reasoning, j.blockers, j.score, j.subscores, j.remote_truth,
+      j.remote_evidence, j.ghost_risk, j.judged_at,
+      p.last_seen < (SELECT datetime(MAX(last_seen), '-1 day') FROM postings q WHERE q.ats = p.ats AND q.slug = p.slug) AS closed
     FROM postings p JOIN judgments j ON j.posting_id = p.id
+    JOIN screens s ON s.posting_id = p.id AND s.verdict = 'pass'
     WHERE j.rating IN ('STRONG','FAIR','WEAK')
     ORDER BY CASE j.rating WHEN 'STRONG' THEN 0 WHEN 'FAIR' THEN 1 ELSE 2 END,
-             COALESCE(p.posted_at, p.first_seen) DESC`);
+             COALESCE(j.score, 0) DESC, COALESCE(p.posted_at, p.first_seen) DESC`);
+  const since = store.getMeta('last_report');
+  const fresh = since ? rows.filter((r) => r.judged_at > since) : [];
   const today = new Date().toISOString().slice(0, 10);
   const out: string[] = [`# jobpipe — ${today}`, ''];
   const totals = store.query(`SELECT COUNT(*) n FROM postings`)[0]?.n ?? 0;
   const passed = store.query(`SELECT COUNT(*) n FROM screens WHERE verdict='pass'`)[0]?.n ?? 0;
   out.push(`${totals} postings held · ${passed} passed the screen · ${rows.length} rated worth a look.`, '');
+  if (since) {
+    out.push(`## New since last report (${since.slice(0, 16).replace('T', ' ')})`, '');
+    if (!fresh.length) out.push('Nothing new.', '');
+    for (const r of fresh.filter((x) => x.rating !== 'WEAK')) out.push(...entry(r));
+    const weak = fresh.filter((x) => x.rating === 'WEAK').length;
+    if (weak) out.push(`…plus ${weak} new WEAK, listed below.`, '');
+  }
   let heading = '';
   for (const r of rows) {
-    if (r.rating !== heading) { heading = r.rating; out.push(`## ${heading}`, ''); }
-    const blockers = JSON.parse(r.blockers ?? '[]') as string[];
-    out.push(`### ${r.company} — ${r.title}`);
-    out.push(`**${money(r.salary_min)}–${money(r.salary_max)}** · ${r.location ?? 'location not stated'} · posted ${String(r.posted_at ?? '').slice(0, 10) || 'unknown'}`);
-    out.push(r.reasoning);
-    if (blockers.length) out.push(`Blockers: ${blockers.join('; ')}`);
-    out.push(`<${r.url}>`, '');
+    if (r.rating !== heading) { heading = r.rating; out.push(`## All ${heading}`, ''); }
+    out.push(...entry(r));
   }
   const path = flag('out', join(ROOT, 'out', `${today}.md`))!;
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, out.join('\n'));
-  console.log(`${rows.length} rated postings → ${path}`);
+  if (!has('out')) store.setMeta('last_report', new Date().toISOString());
+  console.log(`${rows.length} rated postings (${fresh.length} new) → ${path}`);
+  store.close();
+}
+
+/** What to apply to next: the best judged postings not yet applied to. */
+function cmdQueue(): void {
+  const store = new Store(DB_PATH);
+  const rows = store.queue(Number(flag('limit', '5')));
+  if (!rows.length) { console.log('Queue is empty. Poll, screen and judge to fill it.'); store.close(); return; }
+  for (const [i, r] of rows.entries()) {
+    console.log(`${i + 1}. ${r.score ?? '?'}/5 ${r.rating.padEnd(6)} ${r.company} — ${r.title}`);
+    console.log(`   ${money(r.salary_min)}–${money(r.salary_max)} · ${r.remote_truth ?? 'remote?'} · ${r.ats} · ${r.id}`);
+    console.log(`   ${r.url}`);
+  }
   store.close();
 }
 
@@ -278,7 +320,7 @@ function cmdExportCsv(): void {
 const COMMANDS: Record<string, () => void | Promise<void>> = {
   verify: cmdVerify, poll: cmdPoll, screen: cmdScreen,
   judge: cmdJudge, report: cmdReport, stats: cmdStats,
-  applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
+  queue: cmdQueue, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
 };
 
 const command = process.argv[2];
@@ -290,6 +332,7 @@ if (!command || !COMMANDS[command]) {
   jobpipe screen  [--all]                          apply the deterministic rule-outs
   jobpipe judge   [--limit 20] [--model NAME]      send survivors to Claude
   jobpipe report  [--out PATH]                     write the triage markdown
+  jobpipe queue   [--limit 5]                      best judged postings not yet applied to
   jobpipe stats                                    what the store holds
   jobpipe verify  [--bulk] [--ats A]               check every board still answers
   jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT] [--status S]
