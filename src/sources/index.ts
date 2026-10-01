@@ -19,7 +19,7 @@ export type FetchResult =
   | { ok: true; company: Company; postings: Posting[] }
   | { ok: false; company: Company; error: string };
 
-const USER_AGENT = 'jobfeed/0.1 (personal job search; contact via repo)';
+const USER_AGENT = 'jobpipe/0.1 (personal job search; contact via repo)';
 
 async function fetchOne(company: Company, timeoutMs: number): Promise<FetchResult> {
   const adapter = ADAPTERS[company.ats];

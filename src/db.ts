@@ -67,7 +67,48 @@ CREATE TABLE IF NOT EXISTS polls (
   postings_new INTEGER NOT NULL DEFAULT 0,
   errors TEXT NOT NULL DEFAULT '[]'
 );
+
+-- What Tory actually sent, or tried to. posting_id is null for applications
+-- that came from somewhere jobpipe never polled (Wellfound, Hirebridge, a
+-- referral). Status is free text on purpose: "blocked-not-applied" says more
+-- than any enum would.
+CREATE TABLE IF NOT EXISTS applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  posting_id TEXT REFERENCES postings(id),
+  company TEXT NOT NULL,
+  role TEXT NOT NULL,
+  track TEXT,
+  posted_range TEXT,
+  source TEXT,
+  url TEXT,
+  applied_date TEXT,
+  status TEXT NOT NULL,
+  follow_up_date TEXT,
+  resume_path TEXT,
+  notes TEXT
+);
+CREATE INDEX IF NOT EXISTS applications_posting ON applications(posting_id);
+CREATE UNIQUE INDEX IF NOT EXISTS applications_company_role ON applications(company, role);
 `;
+
+/** The tracker's columns, in the order ~/job-search/applications.csv uses. */
+export const APPLICATION_COLUMNS = ['company', 'role', 'track', 'posted_range', 'source', 'url',
+  'applied_date', 'status', 'follow_up_date', 'notes'] as const;
+
+export type Application = {
+  postingId: string | null;
+  company: string;
+  role: string;
+  track: string | null;
+  postedRange: string | null;
+  source: string | null;
+  url: string | null;
+  appliedDate: string | null;
+  status: string;
+  followUpDate: string | null;
+  resumePath: string | null;
+  notes: string | null;
+};
 
 export class Store {
   readonly db: DatabaseSync;
@@ -134,6 +175,37 @@ export class Store {
         rating = excluded.rating, reasoning = excluded.reasoning,
         blockers = excluded.blockers, judged_at = excluded.judged_at, model = excluded.model
     `).run(j.postingId, j.rating, j.reasoning, JSON.stringify(j.blockers), j.judgedAt, j.model);
+  }
+
+  /**
+   * Records an application, keyed on company + role so re-recording one
+   * updates it rather than duplicating it. Null fields leave what the row
+   * already holds alone, so `applied` can add a confirmation URL without
+   * wiping the notes an import brought in. The first applied_date sticks.
+   */
+  putApplication(a: Application): void {
+    this.db.prepare(`
+      INSERT INTO applications (posting_id, company, role, track, posted_range, source, url,
+        applied_date, status, follow_up_date, resume_path, notes)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(company, role) DO UPDATE SET
+        posting_id = COALESCE(excluded.posting_id, posting_id),
+        track = COALESCE(excluded.track, track),
+        posted_range = COALESCE(excluded.posted_range, posted_range),
+        source = COALESCE(excluded.source, source),
+        url = COALESCE(excluded.url, url),
+        applied_date = COALESCE(applied_date, excluded.applied_date),
+        status = excluded.status,
+        follow_up_date = COALESCE(excluded.follow_up_date, follow_up_date),
+        resume_path = COALESCE(excluded.resume_path, resume_path),
+        notes = COALESCE(excluded.notes, notes)
+    `).run(a.postingId, a.company, a.role, a.track, a.postedRange, a.source, a.url,
+      a.appliedDate, a.status, a.followUpDate, a.resumePath, a.notes);
+  }
+
+  /** Every application, in the order they were first recorded. */
+  applications(): Record<string, any>[] {
+    return this.query('SELECT * FROM applications ORDER BY id');
   }
 
   /** Postings with no screen verdict yet. */

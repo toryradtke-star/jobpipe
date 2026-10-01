@@ -11,11 +11,11 @@
     "jobpipe": "./bin/jobpipe.ts"
   },
   "scripts": {
-    "poll": "node bin/jobpipe.ts poll",
-    "screen": "node bin/jobpipe.ts screen",
-    "judge": "node bin/jobpipe.ts judge",
-    "report": "node bin/jobpipe.ts report",
-    "verify": "node bin/jobpipe.ts verify",
-    "test": "node --test \"src/**/*.test.ts\""
+    "poll": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts poll",
+    "screen": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts screen",
+    "judge": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts judge",
+    "report": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts report",
+    "verify": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts verify",
+    "test": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\""
   }
 }

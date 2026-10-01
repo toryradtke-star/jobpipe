@@ -1,29 +1,36 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --disable-warning=ExperimentalWarning
 /**
- * jobfeed — poll company job boards, screen them against your own rules,
- * judge what survives, and print what is worth your afternoon.
+ * jobpipe — poll job boards, screen them against your own rules, judge what
+ * survives, and track what you applied to.
  *
- * Six commands, each doing one thing:
+ * Each command does one thing:
  *   verify   check every board in the registry still answers
  *   poll     fetch every board and store what is new
  *   screen   apply the deterministic rule-outs to everything unscreened
  *   judge    send survivors to Claude, newest first
  *   report   write the triage markdown
  *   stats    what the store holds right now
+ *   applied     record an application against a posting
+ *   import-csv  load ~/job-search/applications.csv into the store
+ *   export-csv  write the store's applications back out as that CSV
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../src/db.ts';
+import { Store, APPLICATION_COLUMNS } from '../src/db.ts';
+import { detectEol, parseCsvRecords, toCsv } from '../src/csv.ts';
 import { fetchAll, probe } from '../src/sources/index.ts';
 import { screenPosting } from '../src/screen.ts';
 import { judgePosting, type Profile } from '../src/judge.ts';
 import type { Company, Posting } from '../src/types.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DB_PATH = process.env.JOBFEED_DB ?? join(ROOT, 'data', 'jobfeed.db');
-const PROFILE_DIR = process.env.JOBFEED_PROFILE ?? join(ROOT, 'profile');
-const REGISTRY = process.env.JOBFEED_REGISTRY ?? join(ROOT, 'companies.json');
+const env = (name: string) => process.env[`JOBPIPE_${name}`] ?? process.env[`JOBFEED_${name}`];
+const DB_PATH = env('DB') ?? join(ROOT, 'data', 'jobpipe.db');
+const PROFILE_DIR = env('PROFILE') ?? join(ROOT, 'profile');
+const REGISTRY = env('REGISTRY') ?? join(ROOT, 'companies.json');
+const TRACKER = env('TRACKER') ?? join(homedir(), 'job-search', 'applications.csv');
 
 function companies(): Company[] {
   return JSON.parse(readFileSync(REGISTRY, 'utf8')) as Company[];
@@ -153,7 +160,7 @@ function cmdReport(): void {
     ORDER BY CASE j.rating WHEN 'STRONG' THEN 0 WHEN 'FAIR' THEN 1 ELSE 2 END,
              COALESCE(p.posted_at, p.first_seen) DESC`);
   const today = new Date().toISOString().slice(0, 10);
-  const out: string[] = [`# jobfeed — ${today}`, ''];
+  const out: string[] = [`# jobpipe — ${today}`, ''];
   const totals = store.query(`SELECT COUNT(*) n FROM postings`)[0]?.n ?? 0;
   const passed = store.query(`SELECT COUNT(*) n FROM screens WHERE verdict='pass'`)[0]?.n ?? 0;
   out.push(`${totals} postings held · ${passed} passed the screen · ${rows.length} rated worth a look.`, '');
@@ -191,23 +198,81 @@ function cmdStats(): void {
   store.close();
 }
 
+const blank = (v: string | undefined) => (v === undefined || v === '' ? null : v);
+const daysFrom = (iso: string, n: number) =>
+  new Date(Date.parse(iso) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** `jobpipe applied <posting-id> [--status applied] [--resume PATH] [--confirm URL] [--notes TEXT]` */
+function cmdApplied(): void {
+  const id = process.argv[3];
+  if (!id || id.startsWith('--')) { console.error('Usage: jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT]'); process.exit(1); }
+  const store = new Store(DB_PATH);
+  const p = store.query('SELECT * FROM postings WHERE id = ?', id)[0];
+  if (!p) { console.error(`No posting ${id}.`); process.exit(1); }
+  const today = new Date().toISOString().slice(0, 10);
+  const confirm = flag('confirm');
+  const notes = [flag('notes'), confirm && `Confirmation: ${confirm}`].filter(Boolean).join(' ') || null;
+  const range = p.salary_min || p.salary_max ? `${money(p.salary_min)}-${money(p.salary_max)}` : null;
+  store.putApplication({
+    postingId: id, company: p.company, role: p.title, track: flag('track') ?? null,
+    postedRange: range, source: `jobpipe (${p.ats})`, url: p.url, appliedDate: today,
+    status: flag('status', 'applied')!, followUpDate: daysFrom(today, 7),
+    resumePath: flag('resume') ?? null, notes,
+  });
+  console.log(`Recorded: ${p.company} — ${p.title} (${flag('status', 'applied')}), follow up ${daysFrom(today, 7)}.`);
+  store.close();
+}
+
+function cmdImportCsv(): void {
+  const path = flag('from', TRACKER)!;
+  const store = new Store(DB_PATH);
+  const records = parseCsvRecords(readFileSync(path, 'utf8'));
+  for (const r of records) {
+    // Match the row back to a polled posting when the URL is one we hold.
+    const posting = r.url ? store.query('SELECT id FROM postings WHERE url = ?', r.url)[0] : undefined;
+    store.putApplication({
+      postingId: posting?.id ?? null, company: r.company, role: r.role, track: blank(r.track),
+      postedRange: blank(r.posted_range), source: blank(r.source), url: blank(r.url),
+      appliedDate: blank(r.applied_date), status: r.status || 'unknown',
+      followUpDate: blank(r.follow_up_date), resumePath: null, notes: blank(r.notes),
+    });
+  }
+  console.log(`Imported ${records.length} applications from ${path}.`);
+  store.close();
+}
+
+function cmdExportCsv(): void {
+  const path = flag('out', TRACKER)!;
+  const store = new Store(DB_PATH);
+  const rows = store.applications();
+  const existing = existsSync(path) ? path : existsSync(TRACKER) ? TRACKER : null;
+  const eol = existing ? detectEol(readFileSync(existing, 'utf8')) : '\r\n';
+  writeFileSync(path, toCsv([...APPLICATION_COLUMNS], rows, eol));
+  console.log(`${rows.length} applications → ${path}`);
+  store.close();
+}
+
 const COMMANDS: Record<string, () => void | Promise<void>> = {
   verify: cmdVerify, poll: cmdPoll, screen: cmdScreen,
   judge: cmdJudge, report: cmdReport, stats: cmdStats,
+  applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
 };
 
 const command = process.argv[2];
 if (!command || !COMMANDS[command]) {
-  console.log(`jobfeed — a personal job-posting collector
+  console.log(`jobpipe — find, judge and track job postings
 
-  jobfeed poll    [--tag saas] [--concurrency 4]   fetch every board, store what is new
-  jobfeed screen  [--all]                          apply the deterministic rule-outs
-  jobfeed judge   [--limit 20] [--model NAME]      send survivors to Claude
-  jobfeed report  [--out PATH]                     write the triage markdown
-  jobfeed stats                                    what the store holds
-  jobfeed verify                                   check every board still answers
+  jobpipe poll    [--tag saas] [--concurrency 4]   fetch every board, store what is new
+  jobpipe screen  [--all]                          apply the deterministic rule-outs
+  jobpipe judge   [--limit 20] [--model NAME]      send survivors to Claude
+  jobpipe report  [--out PATH]                     write the triage markdown
+  jobpipe stats                                    what the store holds
+  jobpipe verify                                   check every board still answers
+  jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT] [--status S]
+  jobpipe import-csv [--from PATH]                 load the tracker CSV into the store
+  jobpipe export-csv [--out PATH]                  write applications back out as CSV
 
-Env: JOBFEED_DB, JOBFEED_PROFILE, JOBFEED_REGISTRY`);
+Env: JOBPIPE_DB, JOBPIPE_PROFILE, JOBPIPE_REGISTRY, JOBPIPE_TRACKER (JOBFEED_* still read)`);
   process.exit(command ? 1 : 0);
 }
 await COMMANDS[command]();
