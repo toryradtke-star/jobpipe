@@ -1,0 +1,583 @@
+[
+  {
+    "name": "Airtable",
+    "ats": "greenhouse",
+    "slug": "airtable",
+    "tags": [
+      "saas"
+    ]
+  },
+  {
+    "name": "Amplitude",
+    "ats": "greenhouse",
+    "slug": "amplitude",
+    "tags": [
+      "analytics",
+      "martech"
+    ]
+  },
+  {
+    "name": "Anthropic",
+    "ats": "greenhouse",
+    "slug": "anthropic",
+    "tags": [
+      "ai"
+    ]
+  },
+  {
+    "name": "Apollo.io",
+    "ats": "greenhouse",
+    "slug": "apolloio",
+    "tags": [
+      "gtm",
+      "martech"
+    ]
+  },
+  {
+    "name": "Asana",
+    "ats": "greenhouse",
+    "slug": "asana",
+    "tags": [
+      "saas"
+    ]
+  },
+  {
+    "name": "Ashby",
+    "ats": "ashby",
+    "slug": "ashby",
+    "tags": [
+      "hr"
+    ]
+  },
+  {
+    "name": "Attentive",
+    "ats": "greenhouse",
+    "slug": "attentive",
+    "tags": [
+      "martech",
+      "ecommerce"
+    ]
+  },
+  {
+    "name": "Attio",
+    "ats": "ashby",
+    "slug": "attio",
+    "tags": [
+      "gtm",
+      "crm"
+    ]
+  },
+  {
+    "name": "Braze",
+    "ats": "greenhouse",
+    "slug": "braze",
+    "tags": [
+      "martech"
+    ]
+  },
+  {
+    "name": "Brex",
+    "ats": "greenhouse",
+    "slug": "brex",
+    "tags": [
+      "fintech"
+    ]
+  },
+  {
+    "name": "Calendly",
+    "ats": "greenhouse",
+    "slug": "calendly",
+    "tags": [
+      "gtm",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Carta",
+    "ats": "greenhouse",
+    "slug": "carta",
+    "tags": [
+      "fintech"
+    ]
+  },
+  {
+    "name": "Checkr",
+    "ats": "greenhouse",
+    "slug": "checkr",
+    "tags": [
+      "saas"
+    ]
+  },
+  {
+    "name": "CircleCI",
+    "ats": "greenhouse",
+    "slug": "circleci",
+    "tags": [
+      "devtools",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Cloudflare",
+    "ats": "greenhouse",
+    "slug": "cloudflare",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "Contentful",
+    "ats": "greenhouse",
+    "slug": "contentful",
+    "tags": [
+      "web",
+      "cms"
+    ]
+  },
+  {
+    "name": "Culture Amp",
+    "ats": "greenhouse",
+    "slug": "cultureamp",
+    "tags": [
+      "hr"
+    ]
+  },
+  {
+    "name": "Datadog",
+    "ats": "greenhouse",
+    "slug": "datadog",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "Doximity",
+    "ats": "greenhouse",
+    "slug": "doximity",
+    "tags": [
+      "health",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Figma",
+    "ats": "greenhouse",
+    "slug": "figma",
+    "tags": [
+      "design"
+    ]
+  },
+  {
+    "name": "Fivetran",
+    "ats": "greenhouse",
+    "slug": "fivetran",
+    "tags": [
+      "data"
+    ]
+  },
+  {
+    "name": "GitLab",
+    "ats": "greenhouse",
+    "slug": "gitlab",
+    "tags": [
+      "devtools",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Gorgias",
+    "ats": "ashby",
+    "slug": "gorgias",
+    "tags": [
+      "ecommerce"
+    ]
+  },
+  {
+    "name": "Grafana Labs",
+    "ats": "greenhouse",
+    "slug": "grafanalabs",
+    "tags": [
+      "devtools",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Greenhouse",
+    "ats": "greenhouse",
+    "slug": "greenhouse",
+    "tags": [
+      "hr"
+    ]
+  },
+  {
+    "name": "Gusto",
+    "ats": "greenhouse",
+    "slug": "gusto",
+    "tags": [
+      "hr"
+    ]
+  },
+  {
+    "name": "Hightouch",
+    "ats": "ashby",
+    "slug": "hightouch",
+    "tags": [
+      "data",
+      "gtm"
+    ]
+  },
+  {
+    "name": "Intercom",
+    "ats": "greenhouse",
+    "slug": "intercom",
+    "tags": [
+      "martech"
+    ]
+  },
+  {
+    "name": "Iterable",
+    "ats": "greenhouse",
+    "slug": "iterable",
+    "tags": [
+      "martech"
+    ]
+  },
+  {
+    "name": "Klaviyo",
+    "ats": "greenhouse",
+    "slug": "klaviyo",
+    "tags": [
+      "martech",
+      "ecommerce"
+    ]
+  },
+  {
+    "name": "Knock",
+    "ats": "ashby",
+    "slug": "knock",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "LangChain",
+    "ats": "ashby",
+    "slug": "langchain",
+    "tags": [
+      "ai"
+    ]
+  },
+  {
+    "name": "Lattice",
+    "ats": "greenhouse",
+    "slug": "lattice",
+    "tags": [
+      "hr"
+    ]
+  },
+  {
+    "name": "LaunchDarkly",
+    "ats": "greenhouse",
+    "slug": "launchdarkly",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "Linear",
+    "ats": "ashby",
+    "slug": "linear",
+    "tags": [
+      "saas"
+    ]
+  },
+  {
+    "name": "Make",
+    "ats": "greenhouse",
+    "slug": "make",
+    "tags": [
+      "automation"
+    ]
+  },
+  {
+    "name": "Merge",
+    "ats": "ashby",
+    "slug": "merge",
+    "tags": [
+      "automation"
+    ]
+  },
+  {
+    "name": "Mixpanel",
+    "ats": "greenhouse",
+    "slug": "mixpanel",
+    "tags": [
+      "analytics",
+      "martech"
+    ]
+  },
+  {
+    "name": "n8n",
+    "ats": "ashby",
+    "slug": "n8n",
+    "tags": [
+      "automation"
+    ]
+  },
+  {
+    "name": "Neon",
+    "ats": "ashby",
+    "slug": "neon",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "Netlify",
+    "ats": "greenhouse",
+    "slug": "netlify",
+    "tags": [
+      "web",
+      "devtools"
+    ]
+  },
+  {
+    "name": "OpenAI",
+    "ats": "ashby",
+    "slug": "openai",
+    "tags": [
+      "ai"
+    ]
+  },
+  {
+    "name": "Paragon",
+    "ats": "ashby",
+    "slug": "paragon",
+    "tags": [
+      "automation"
+    ]
+  },
+  {
+    "name": "Pendo",
+    "ats": "greenhouse",
+    "slug": "pendo",
+    "tags": [
+      "analytics",
+      "martech"
+    ]
+  },
+  {
+    "name": "PostHog",
+    "ats": "ashby",
+    "slug": "posthog",
+    "tags": [
+      "analytics",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Railway",
+    "ats": "ashby",
+    "slug": "railway",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "Ramp",
+    "ats": "ashby",
+    "slug": "ramp",
+    "tags": [
+      "fintech"
+    ]
+  },
+  {
+    "name": "Remote.com",
+    "ats": "greenhouse",
+    "slug": "remotecom",
+    "tags": [
+      "hr",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Render",
+    "ats": "ashby",
+    "slug": "render",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "Replit",
+    "ats": "ashby",
+    "slug": "replit",
+    "tags": [
+      "devtools",
+      "ai"
+    ]
+  },
+  {
+    "name": "Resend",
+    "ats": "ashby",
+    "slug": "resend",
+    "tags": [
+      "devtools"
+    ]
+  },
+  {
+    "name": "Salesloft",
+    "ats": "greenhouse",
+    "slug": "salesloft",
+    "tags": [
+      "gtm"
+    ]
+  },
+  {
+    "name": "Sanity",
+    "ats": "ashby",
+    "slug": "sanity",
+    "tags": [
+      "web",
+      "cms"
+    ]
+  },
+  {
+    "name": "Scale AI",
+    "ats": "greenhouse",
+    "slug": "scaleai",
+    "tags": [
+      "ai"
+    ]
+  },
+  {
+    "name": "Similarweb",
+    "ats": "greenhouse",
+    "slug": "similarweb",
+    "tags": [
+      "analytics",
+      "martech"
+    ]
+  },
+  {
+    "name": "Squarespace",
+    "ats": "greenhouse",
+    "slug": "squarespace",
+    "tags": [
+      "web"
+    ]
+  },
+  {
+    "name": "Storyblok",
+    "ats": "greenhouse",
+    "slug": "storyblok",
+    "tags": [
+      "web",
+      "cms",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Stripe",
+    "ats": "greenhouse",
+    "slug": "stripe",
+    "tags": [
+      "fintech"
+    ]
+  },
+  {
+    "name": "Supabase",
+    "ats": "ashby",
+    "slug": "supabase",
+    "tags": [
+      "devtools",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Tapcart",
+    "ats": "ashby",
+    "slug": "tapcart",
+    "tags": [
+      "ecommerce",
+      "martech"
+    ]
+  },
+  {
+    "name": "Twilio",
+    "ats": "greenhouse",
+    "slug": "twilio",
+    "tags": [
+      "devtools",
+      "remote-first"
+    ]
+  },
+  {
+    "name": "Typeform",
+    "ats": "greenhouse",
+    "slug": "typeform",
+    "tags": [
+      "martech"
+    ]
+  },
+  {
+    "name": "Unbounce",
+    "ats": "greenhouse",
+    "slug": "unbounce",
+    "tags": [
+      "martech",
+      "web"
+    ]
+  },
+  {
+    "name": "Unify",
+    "ats": "ashby",
+    "slug": "unify",
+    "tags": [
+      "gtm"
+    ]
+  },
+  {
+    "name": "Vanta",
+    "ats": "ashby",
+    "slug": "vanta",
+    "tags": [
+      "saas"
+    ]
+  },
+  {
+    "name": "Vercel",
+    "ats": "greenhouse",
+    "slug": "vercel",
+    "tags": [
+      "devtools",
+      "web"
+    ]
+  },
+  {
+    "name": "Webflow",
+    "ats": "greenhouse",
+    "slug": "webflow",
+    "tags": [
+      "web",
+      "cms"
+    ]
+  },
+  {
+    "name": "Workato",
+    "ats": "greenhouse",
+    "slug": "workato",
+    "tags": [
+      "automation"
+    ]
+  },
+  {
+    "name": "Yotpo",
+    "ats": "greenhouse",
+    "slug": "yotpo",
+    "tags": [
+      "ecommerce",
+      "martech"
+    ]
+  }
+]

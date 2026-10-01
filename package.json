@@ -1,0 +1,21 @@
+{
+  "name": "jobpipe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A personal job-posting collector: polls company ATS boards directly, screens against your own rules, and judges what survives.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "jobpipe": "./bin/jobpipe.ts"
+  },
+  "scripts": {
+    "poll": "node bin/jobpipe.ts poll",
+    "screen": "node bin/jobpipe.ts screen",
+    "judge": "node bin/jobpipe.ts judge",
+    "report": "node bin/jobpipe.ts report",
+    "verify": "node bin/jobpipe.ts verify",
+    "test": "node --test \"src/**/*.test.ts\""
+  }
+}
