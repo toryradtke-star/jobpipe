@@ -1,104 +1,108 @@
-# jobfeed
+# jobpipe
 
-A personal job-posting collector. It polls company job boards directly, screens
-them against rules you write down, judges what survives with Claude, and hands
-you a short list.
-
-It exists because the metered alternative gives five postings a day. This
-collects about seven thousand in six seconds, from boards that publish them
-deliberately and without authentication.
-
-## How it works
-
-Four steps, each one cheap enough to run as often as you like.
+My own job search, run as a pipeline: find postings, screen them, have Claude
+judge what survives, tailor a resume, apply, and track what happened. One
+SQLite file holds all of it. Node 22, no dependencies, no build step.
 
 ```
-poll  →  screen  →  judge  →  report
-7000     6700 out   ~200 read   a page you can act on
+poll  →  screen  →  judge  →  queue  →  tailor → build  →  apply  →  track
+8,600    8,000 out   ~600 read   top 5     fact-checked       headless    CSV
 ```
-
-**poll** fetches every board in `companies.json`. Greenhouse, Ashby and Lever
-all publish an unauthenticated JSON endpoint carrying the full description of
-every open role, because employers want those postings read. One request per
-company, four at a time.
-
-**screen** applies the deterministic rule-outs in `src/screen.ts` — the ones
-that need no judgment: a level word in the title, a stated range under your
-floor, the word "clearance", an office-days requirement. It costs nothing and
-removes roughly 97% of what came in.
-
-**judge** sends what is left to Claude through the `claude` CLI already on your
-machine, with your rules and your background attached, and stores a rating and
-its reasoning. Because it runs on the subscription rather than an API key, the
-judging budget is effectively your afternoon rather than a quota.
-
-**report** writes the survivors to markdown, best first.
-
-Nothing is ever deleted. A posting that vanishes from a board simply stops
-having its `last_seen` moved forward, which is how a closed role is told apart
-from a live one.
 
 ## The design decision that matters
 
-The tool this replaces gates its matching engine behind its collection quota:
-ranking by meaning, ranking against your own profile and setting a match
-threshold all work only on postings you have already paid to collect, and
-collection hands them over newest-first. You buy blind, then rank.
+Collection is free, so everything is collected. Judgment is expensive, so it
+sits downstream of a screen that costs nothing.
 
-This inverts that. Collection is free, so everything is collected. All the
-judgment sits downstream of a screen that costs nothing. The expensive step —
-a model reading a whole description — only ever runs on the couple of hundred
-postings that survived rules you wrote yourself.
+The hosted tool this replaced did it the other way round: its matching engine
+only ran on postings you had already spent your daily quota collecting, handed
+over newest-first, so you bought blind and ranked afterwards. Here a poll pulls
+thousands of postings in under a minute, deterministic rules cut ~93%, and a
+model reads a whole description only for the few hundred that are left.
 
-## Setup
+Every knob is upstream of the model, and every rule-out is measurable: a
+rejection stores every rule that fired, so the cost of a rule is the number of
+postings it kills *alone*. That is how the rules get tuned — never by feel.
 
-Node 22.18 or newer. No dependencies, no build step: Node runs the TypeScript
-directly and `node:sqlite` ships with the runtime.
+## Stages
 
-Put two files in `profile/` (gitignored, and it should stay that way):
+**poll** — `src/sources/`. Greenhouse, Ashby and Lever publish unauthenticated
+JSON for every open role; one GET per board. Workday has no such feed, so its
+adapter searches each site for target titles, drops what the screen would
+reject, and only then fetches descriptions. Remote boards (Himalayas, Remotive,
+RemoteOK, We Work Remotely) are many employers in one feed. Indeed comes through
+[JobSpy](https://github.com/speedyapply/JobSpy), opt-in and low volume.
+Postings are never deleted: a closed role just stops having `last_seen` moved,
+which is how live and closed are told apart.
 
-- `constraints.md` — your hard rule-outs, one per line. What makes a posting
-  an instant no.
-- `background.md` — who you are, what you actually ship, and your honest gaps.
-  The gaps matter more than the strengths; they are what stops the judge
-  returning everything as a maybe.
+**screen** — `src/screen.ts`, `src/place.ts`. Named rules: level words, job
+family, specialisms, a stated range under the floor, clearance, office days,
+location. The bias is one-way — *when in doubt, pass* — because the judge is
+cheap and a wrongly discarded posting is never seen again. Each past bug is a
+pinned test (Roman numerals rescuing "Senior … II"; "London, UK" matching a
+state code; benefits boilerplate saying "remote" over an office location).
+
+**dedupe** — `src/dedupe.ts`. The same job on the employer's board, a feed and
+Indeed three times over is one fingerprint (normalized company + title). Dedupe
+runs *after* the other rules, among copies that passed — run first, a London
+copy could beat the US-remote copy of the same job and the job was lost.
+
+**judge** — `src/judge.ts`. `claude -p`, four at a time, one JSON object back:
+a 1–5 score with subscores, a **remote-truth** verdict quoting the posting
+(boards' "remote" labels have been wrong), and **ghost risk** from facts the
+store supplies — age, still listed, reposts. Unparseable replies are recorded
+as failures, never guessed at. A run that hits a usage limit resumes where it
+stopped.
+
+**tailor / build** — the resume is edited against the posting (emphasis and
+wording only), rendered to PDF, and refused if it is not one page or is
+identical to the master.
+
+**autoapply** — `src/autoapply.ts`. Unattended, within a narrow lane:
+
+- only postings scored 4+, believed remote, low ghost risk;
+- only through the employer's own Greenhouse/Lever/Ashby copy, found by probing
+  likely slugs and matching the title, and that copy must pass the screen too;
+- the tailored resume must pass a **fact check**: no number or proper noun the
+  source documents don't already contain, header unchanged, no "managed spend";
+- a fresh headless, profile-less Chrome per attempt via Playwright MCP, with
+  hard stops for accounts, passwords, CAPTCHAs, ID or financial fields, and
+  on-site or relocation requirements; demographic questions always left blank;
+- counted only when it ends on the board's own host with a confirmation, and
+  **never retried** — an attempt that died may have submitted.
+
+**track** — applications keyed on company + role, synced byte-for-byte with a
+CSV tracker.
+
+## Running it
+
+Personal files live in `profile/` (gitignored): `constraints.md` (hard
+rule-outs), `background.md` (who you are, including honest gaps — those are
+what stop the judge calling everything a maybe), and `rules.json` (`payFloor`).
 
 ```bash
-node bin/jobfeed.ts poll      # fetch every board
-node bin/jobfeed.ts screen    # apply the rule-outs
-node bin/jobfeed.ts judge     # read the survivors, --limit 20 by default
-node bin/jobfeed.ts report    # write out/YYYY-MM-DD.md
-node bin/jobfeed.ts stats     # what the store holds
-node bin/jobfeed.ts verify    # check every board still answers
+./bin/jobpipe.ts poll [--scrape] [--bulk]
+./bin/jobpipe.ts screen [--all]
+./bin/jobpipe.ts judge --limit 40
+./bin/jobpipe.ts report            # out/YYYY-MM-DD.md, with "new since last report"
+./bin/jobpipe.ts queue
+./bin/jobpipe.ts tailor <id> && ./bin/jobpipe.ts build <id>
+./bin/jobpipe.ts autoapply --dry-run
+npm test
 ```
 
-Useful flags: `--tag martech` polls one slice of the registry, `--concurrency N`
-on poll and judge, `--limit N` and `--model NAME` on judge, `--all` re-screens
-everything after you change a rule, `--out PATH` on report.
+`scripts/scheduled-run.sh` is the daily run for a systemd user timer.
 
-Environment: `JOBFEED_DB`, `JOBFEED_PROFILE`, `JOBFEED_REGISTRY`.
+## Registry
 
-## Growing the registry
-
-`companies.json` holds 69 verified boards. Every entry was probed before it
-went in; none of them are guesses. To add more, append `{name, ats, slug, tags}`
-and run `verify` — a slug that does not answer is reported rather than silently
-returning nothing. The slug is the last path segment of a company's public job
-board URL:
-
-```
-job-boards.greenhouse.io/SLUG        → {"ats":"greenhouse","slug":"SLUG"}
-jobs.ashbyhq.com/SLUG                → {"ats":"ashby","slug":"SLUG"}
-jobs.lever.co/SLUG                   → {"ats":"lever","slug":"SLUG"}
-```
-
-The registry is the part worth your time. The code stopped being the hard
-problem once the three adapters worked; which companies are in the file is what
-decides whether the output is any good.
+`companies.json` holds 74 boards, each probed live before it went in; `verify`
+re-checks them. The registry decides output quality more than the code does —
+once the adapters worked, which companies are in the file became the whole
+game. A bulk registry of thousands more is built locally by
+`scripts/import-slugs.ts` from a CC BY-NC slug list and is never committed.
 
 ## Scope
 
-Career sites only — an employer's own board. It does not touch LinkedIn or
-Indeed, which forbid it in their terms and have litigated the point. That is a
-real gap: a company not on Greenhouse, Ashby or Lever is invisible here, and
-the fix is adding their ATS to `src/sources/`, not scraping an aggregator.
+LinkedIn is never polled or automated. Indeed is read through JobSpy at low
+volume for personal use. Everything else is a public feed an employer or board
+publishes to be read.

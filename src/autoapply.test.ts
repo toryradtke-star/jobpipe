@@ -1,12 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { applyUrl, confirmedSubmission, factCheck, matchTitle, parseApplyResult, slugCandidates, type ApplyResult } from './autoapply.ts';
 import type { Posting } from './types.ts';
 
-const MASTER = readFileSync(join(homedir(), 'job-search', 'resume', 'master-frontend.md'), 'utf8');
+// A made-up candidate, so the tests run anywhere and publish nothing personal.
+const MASTER = readFileSync(new URL('./fixtures/resume-master.md', import.meta.url), 'utf8');
 const swap = (from: string, to: string) => { assert.ok(MASTER.includes(from), `fixture moved: ${from}`); return MASTER.replace(from, to); };
 
 test('a reordered, reworded resume passes the fact check', () => {
@@ -44,7 +43,7 @@ test('claiming to manage ad spend is caught', () => {
 });
 
 test('a changed header is caught', () => {
-  assert.match(factCheck(MASTER.replace(/^phone: .*$/m, 'phone: 555-0100'), MASTER, '').join(), /header/);
+  assert.match(factCheck(swap('phone: 555-0100', 'phone: 555-0199'), MASTER, '').join(), /header/);
 });
 
 test('slug candidates cover the usual spellings', () => {

@@ -12,7 +12,7 @@ test('empty trailing fields survive', () => {
 });
 
 test('records round-trip through toCsv unchanged', () => {
-  const text = `company,role,notes\nSuger,GTM Engineer,"Blocked: 'SF office', 3+ days"\nOutform,"Dev, Web",plain\n`;
+  const text = `company,role,notes\nAcme,GTM Engineer,"Blocked: 'SF office', 3+ days"\nGlobex,"Dev, Web",plain\n`;
   const header = parseCsv(text)[0];
   assert.equal(toCsv(header, parseCsvRecords(text), detectEol(text)), text);
 });

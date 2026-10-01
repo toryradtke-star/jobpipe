@@ -1,7 +1,7 @@
 /**
  * The deterministic screen: the rules that can be decided without a model.
  *
- * These are Tory's rule-outs from job-search/pinloop/constraints.txt, written
+ * These are the candidate's rule-outs, written
  * as code. Every rule is named, and a posting that is ruled out records which
  * rules fired, so a screen that is throwing away good postings can be argued
  * with rather than guessed at.
@@ -17,7 +17,8 @@ import type { Posting, Screen } from './types.ts';
 import { readPlace } from './place.ts';
 
 export type Rules = {
-  /** Skip when the top of a stated range is below this. Unstated pay passes. */
+  /** Skip when the top of a stated range is below this. Unstated pay passes.
+   *  The real figure lives in profile/rules.json, which is never committed. */
   payFloor: number;
   /** Words in a title that mean the role is above this candidate's level. */
   tooSenior: RegExp;

@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { screenPosting } from './screen.ts';
+import { DEFAULT_RULES, screenPosting } from './screen.ts';
 import { parseSalary } from './normalize.ts';
 import { readPlace } from './place.ts';
 import type { Posting } from './types.ts';
@@ -55,8 +55,10 @@ test('a non-US city is ruled out even when remote', () => {
 });
 
 test('a stated range under the floor is ruled out; silence is not', () => {
-  assert.ok(reasons({ salaryMin: 50_000, salaryMax: 68_000 }).includes('below-floor'));
-  assert.ok(!reasons({ salaryMin: null, salaryMax: null }).includes('below-floor'));
+  const floored = (over: Partial<Posting>) => screenPosting(posting(over), { ...DEFAULT_RULES, payFloor: 100 }).reasons;
+  assert.ok(floored({ salaryMin: 10, salaryMax: 50 }).includes('below-floor'));
+  assert.ok(!floored({ salaryMin: null, salaryMax: null }).includes('below-floor'));
+  assert.ok(!reasons({ salaryMin: 50_000, salaryMax: 58_000 }).includes('below-floor'), 'no floor by default');
 });
 
 test('a degree requirement the posting softens does not fire', () => {

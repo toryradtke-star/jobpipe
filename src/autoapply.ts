@@ -1,7 +1,7 @@
 /**
  * Applying without Tory at the keyboard.
  *
- * Tory asked for this on 2026-10-01, knowing the Carbon Arc history. What
+ * Tory asked for this on 2026-10-01, knowing how an early manual one went wrong. What
  * keeps it honest is the lane, not a person:
  *
  *   - only postings the judge scored 4+, believed remote, and saw low ghost

@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { Store, APPLICATION_COLUMNS } from '../src/db.ts';
 import { detectEol, parseCsvRecords, toCsv } from '../src/csv.ts';
 import { fetchAll, probe } from '../src/sources/index.ts';
-import { screenPosting } from '../src/screen.ts';
+import { DEFAULT_RULES, screenPosting, type Rules } from '../src/screen.ts';
 import { fingerprint, preferred, SOURCE_RANK } from '../src/dedupe.ts';
 import { judgePosting, type Profile } from '../src/judge.ts';
 import type { Company, Posting } from '../src/types.ts';
@@ -55,6 +55,15 @@ function companies(): Company[] {
   const scrape = has('scrape') || tag === 'scrape';
   return list.filter((c) => (!ats || ats.includes(c.ats)) && (!tag || (c.tags ?? []).includes(tag))
     && (scrape || !(c.tags ?? []).includes('scrape')));
+}
+
+/** The screen's rules, with personal numbers (the pay floor) from profile/rules.json. */
+let cachedRules: Rules | undefined;
+function rules(): Rules {
+  if (cachedRules) return cachedRules;
+  const path = join(PROFILE_DIR, 'rules.json');
+  const own = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) as Partial<Pick<Rules, 'payFloor'>> : {};
+  return (cachedRules = { ...DEFAULT_RULES, ...(typeof own.payFloor === 'number' ? { payFloor: own.payFloor } : {}) });
 }
 
 function profile(): Profile {
@@ -128,7 +137,7 @@ function cmdScreen(): void {
   let passed = 0;
   for (const raw of pending) {
     const p = has('all') ? rehydrate(raw as any) : raw;
-    const s = screenPosting(p);
+    const s = screenPosting(p, rules());
     touched.add(fingerprint(p.company, p.title));
     store.putScreen(s);
     if (s.verdict === 'pass') passed++;
@@ -377,7 +386,7 @@ function cmdTailor(): void {
 /**
  * `jobpipe build <posting-id>` — renders resume.md and checks the result is
  * fit to send: one page, and actually tailored (it differs from the master).
- * The Carbon Arc application went out with the master PDF; this is the check
+ * An early application went out with the master PDF; this is the check
  * that would have caught it.
  */
 function cmdBuild(): void {
@@ -469,7 +478,7 @@ async function cmdAutoapply(): Promise<void> {
       if (emp) store.upsertPostings([emp]);
     }
     if (!emp) { record(c.id, 'not-in-lane', `no copy on the employer's own Greenhouse, Lever or Ashby board`, null, null); continue; }
-    const screen = screenPosting(emp);
+    const screen = screenPosting(emp, rules());
     if (screen.verdict !== 'pass') { record(c.id, 'not-in-lane', `the employer's copy fails the screen: ${screen.reasons.join(', ')}`, emp.id, null); continue; }
     const url = applyUrl(emp)!;
     const already = store.query('SELECT 1 FROM applications WHERE posting_id = ? OR (company = ? AND role = ?)', emp.id, c.company, c.title);
