@@ -636,5 +636,20 @@
       "remote-full-stack-programming-jobs",
       "remote-front-end-programming-jobs"
     ]
+  },
+  {
+    "name": "Indeed",
+    "ats": "jobspy",
+    "slug": "indeed",
+    "tags": [
+      "scrape"
+    ],
+    "search": [
+      "marketing automation",
+      "marketing operations",
+      "marketing technologist",
+      "GTM engineer",
+      "web developer marketing"
+    ]
   }
 ]

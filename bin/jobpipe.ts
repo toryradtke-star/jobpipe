@@ -22,6 +22,7 @@ import { Store, APPLICATION_COLUMNS } from '../src/db.ts';
 import { detectEol, parseCsvRecords, toCsv } from '../src/csv.ts';
 import { fetchAll, probe } from '../src/sources/index.ts';
 import { screenPosting } from '../src/screen.ts';
+import { fingerprint, preferred } from '../src/dedupe.ts';
 import { judgePosting, type Profile } from '../src/judge.ts';
 import type { Company, Posting } from '../src/types.ts';
 
@@ -43,7 +44,10 @@ function companies(): Company[] {
   if (has('bulk') && existsSync(BULK_REGISTRY)) list.push(...JSON.parse(readFileSync(BULK_REGISTRY, 'utf8')) as Company[]);
   const ats = flag('ats')?.split(',');
   const tag = flag('tag');
-  return list.filter((c) => (!ats || ats.includes(c.ats)) && (!tag || (c.tags ?? []).includes(tag)));
+  // Scraped sites (JobSpy) are slow and rate-limited; they run only when asked for.
+  const scrape = has('scrape') || tag === 'scrape';
+  return list.filter((c) => (!ats || ats.includes(c.ats)) && (!tag || (c.tags ?? []).includes(tag))
+    && (scrape || !(c.tags ?? []).includes('scrape')));
 }
 
 function profile(): Profile {
@@ -112,13 +116,23 @@ function cmdScreen(): void {
     : store.unscreened();
   if (!pending.length) { console.log('Nothing to screen.'); store.close(); return; }
   const tally = new Map<string, number>();
+  const touched = new Set<string>();
   let passed = 0;
   for (const raw of pending) {
     const p = has('all') ? rehydrate(raw as any) : raw;
     const s = screenPosting(p);
+    touched.add(fingerprint(p.company, p.title));
     store.putScreen(s);
     if (s.verdict === 'pass') passed++;
     for (const r of s.reasons) tally.set(r, (tally.get(r) ?? 0) + 1);
+  }
+  // Dedupe last, among copies that passed everything else, so the copy kept
+  // is one that can actually be applied to. The judge then reads each job once.
+  for (const fp of touched) {
+    const copies = store.passingCopies(fp);
+    if (copies.length < 2) continue;
+    const keep = preferred(copies).id;
+    for (const c of copies) if (c.id !== keep) { store.markDuplicate(c.id); passed--; tally.set('duplicate', (tally.get('duplicate') ?? 0) + 1); }
   }
   console.log(`Screened ${pending.length}. ${passed} passed, ${pending.length - passed} ruled out.`);
   for (const [reason, n] of [...tally].sort((a, b) => b[1] - a[1])) {
@@ -271,7 +285,7 @@ const command = process.argv[2];
 if (!command || !COMMANDS[command]) {
   console.log(`jobpipe — find, judge and track job postings
 
-  jobpipe poll    [--bulk] [--ats workday] [--tag saas] [--concurrency 4]
+  jobpipe poll    [--bulk] [--scrape] [--ats workday] [--tag saas] [--concurrency 4]
                                                    fetch every board, store what is new
   jobpipe screen  [--all]                          apply the deterministic rule-outs
   jobpipe judge   [--limit 20] [--model NAME]      send survivors to Claude

@@ -6,3 +6,4 @@ data/
 profile/
 out/
 applications/
+.venv/

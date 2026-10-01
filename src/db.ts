@@ -14,6 +14,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Judgment, Posting, Screen } from './types.ts';
+import { fingerprint, type Candidate } from './dedupe.ts';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS postings (
@@ -119,6 +120,22 @@ export class Store {
     this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec('PRAGMA foreign_keys = ON;');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Columns added after a store was first created, backfilled once. */
+  private migrate(): void {
+    const cols = new Set((this.db.prepare('PRAGMA table_info(postings)').all() as { name: string }[]).map((c) => c.name));
+    if (!cols.has('fingerprint')) {
+      this.db.exec('ALTER TABLE postings ADD COLUMN fingerprint TEXT');
+      const set = this.db.prepare('UPDATE postings SET fingerprint = ? WHERE id = ?');
+      this.db.exec('BEGIN');
+      for (const r of this.db.prepare('SELECT id, company, title FROM postings').all() as Record<string, string>[]) {
+        set.run(fingerprint(r.company, r.title), r.id);
+      }
+      this.db.exec('COMMIT');
+    }
+    this.db.exec('CREATE INDEX IF NOT EXISTS postings_fingerprint ON postings(fingerprint)');
   }
 
   /**
@@ -130,10 +147,11 @@ export class Store {
     const insert = this.db.prepare(`
       INSERT INTO postings (id, ats, slug, company, external_id, title, description, location,
         department, employment_type, posted_at, url, salary_min, salary_max, salary_source,
-        first_seen, last_seen)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        first_seen, last_seen, fingerprint)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
+        fingerprint = excluded.fingerprint,
         description = excluded.description,
         location = excluded.location,
         salary_min = excluded.salary_min,
@@ -149,7 +167,8 @@ export class Store {
         if (!exists.get(p.id)) added++;
         insert.run(p.id, p.ats, p.slug, p.company, p.externalId, p.title, p.description,
           p.location, p.department, p.employmentType, p.postedAt, p.url,
-          p.salaryMin, p.salaryMax, p.salarySource, p.firstSeen, p.lastSeen);
+          p.salaryMin, p.salaryMax, p.salarySource, p.firstSeen, p.lastSeen,
+          fingerprint(p.company, p.title));
       }
       this.db.exec('COMMIT');
     } catch (err) {
@@ -206,6 +225,19 @@ export class Store {
   /** Every application, in the order they were first recorded. */
   applications(): Record<string, any>[] {
     return this.query('SELECT * FROM applications ORDER BY id');
+  }
+
+  /** Copies of a job that passed every rule but dedupe. */
+  passingCopies(fp: string): Candidate[] {
+    return (this.db.prepare(`SELECT p.id, p.ats, p.first_seen, p.last_seen, j.posting_id IS NOT NULL AS judged
+      FROM postings p JOIN screens s ON s.posting_id = p.id AND s.verdict = 'pass'
+      LEFT JOIN judgments j ON j.posting_id = p.id
+      WHERE p.fingerprint = ?`).all(fp) as Record<string, any>[])
+      .map((r) => ({ id: r.id, ats: r.ats, firstSeen: r.first_seen, lastSeen: r.last_seen, judged: !!r.judged }));
+  }
+
+  markDuplicate(id: string): void {
+    this.db.prepare(`UPDATE screens SET verdict = 'out', reasons = '["duplicate"]' WHERE posting_id = ?`).run(id);
   }
 
   /** Postings with no screen verdict yet. */

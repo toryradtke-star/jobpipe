@@ -37,7 +37,9 @@ export type Posting = {
 
 export type Ats = 'greenhouse' | 'ashby' | 'lever' | 'workday'
   // Multi-employer remote boards; see src/sources/remote-boards.ts.
-  | 'remotive' | 'remoteok' | 'himalayas' | 'wwr';
+  | 'remotive' | 'remoteok' | 'himalayas' | 'wwr'
+  // Scraped job sites through JobSpy; see src/sources/jobspy.ts.
+  | 'jobspy';
 
 /** One employer's board, as the registry lists it. */
 export type Company = {
