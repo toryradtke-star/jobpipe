@@ -11,6 +11,7 @@
  *   report   write the triage markdown
  *   queue    the next few postings worth applying to
  *   stats    what the store holds right now
+ *   autoapply   tailor, fill and submit the best queued postings, unattended
  *   applied     record an application against a posting
  *   import-csv  load ~/job-search/applications.csv into the store
  *   export-csv  write the store's applications back out as that CSV
@@ -27,6 +28,8 @@ import { screenPosting } from '../src/screen.ts';
 import { fingerprint, preferred, SOURCE_RANK } from '../src/dedupe.ts';
 import { judgePosting, type Profile } from '../src/judge.ts';
 import type { Company, Posting } from '../src/types.ts';
+import { LANE_ATS, applyPrompt, applyUrl, claude, confirmedSubmission, factCheck, matchTitle, parseApplyResult,
+  probeTargets, tailorPrompt } from '../src/autoapply.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const env = (name: string) => process.env[`JOBPIPE_${name}`] ?? process.env[`JOBFEED_${name}`];
@@ -381,11 +384,21 @@ function cmdBuild(): void {
   const store = new Store(DB_PATH);
   const p = postingRow(store, process.argv[3]);
   const dir = applicationDir(p);
+  if (!existsSync(join(dir, 'resume.md'))) { console.error(`No ${join(dir, 'resume.md')}. Run \`jobpipe tailor ${p.id}\` first.`); process.exit(1); }
+  const r = buildResume(p, 'inherit');
+  console.log(`${r.pdf}: ${r.pages} page${r.pages === 1 ? '' : 's'}, ${r.changed} lines changed from ${r.master.split('/').pop()}.`);
+  if (r.problems.length) { console.error(`NOT READY: ${r.problems.join('; ')}.`); process.exitCode = 1; }
+  else console.log(`Ready to attach: ${r.pdf}`);
+  store.close();
+}
+
+/** Renders an application folder's resume.md and says whether it is fit to send. */
+function buildResume(p: Record<string, any>, stdio: 'inherit' | 'pipe' = 'pipe') {
+  const dir = applicationDir(p);
   const resume = join(dir, 'resume.md');
-  if (!existsSync(resume)) { console.error(`No ${resume}. Run \`jobpipe tailor ${p.id}\` first.`); process.exit(1); }
   const meta = existsSync(join(dir, '.jobpipe.json')) ? JSON.parse(readFileSync(join(dir, '.jobpipe.json'), 'utf8')) : {};
-  const master = meta.master ?? join(RESUMES, `master-${trackFor(p.title)}.md`);
-  execFileSync('python3', [join(RESUMES, 'build.py'), resume], { stdio: 'inherit' });
+  const master: string = meta.master ?? join(RESUMES, `master-${trackFor(p.title)}.md`);
+  execFileSync('python3', [join(RESUMES, 'build.py'), resume], { stdio });
   const pdf = join(dir, 'resume.pdf');
   const pages = Number(/Pages:\s+(\d+)/.exec(execFileSync('pdfinfo', [pdf], { encoding: 'utf8' }))?.[1]);
   const same = readFileSync(resume, 'utf8') === readFileSync(master, 'utf8');
@@ -394,17 +407,145 @@ function cmdBuild(): void {
     changed = String(e.stdout ?? '').split('\n')
       .filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l)).length;
   }
-  console.log(`${pdf}: ${pages} page${pages === 1 ? '' : 's'}, ${changed} lines changed from ${master.split('/').pop()}.`);
-  const problems = [pages !== 1 && `it is ${pages} pages, not one`, same && 'it is identical to the master — not tailored'].filter(Boolean);
-  if (problems.length) { console.error(`NOT READY: ${problems.join('; ')}.`); process.exitCode = 1; }
-  else console.log(`Ready to attach: ${pdf}`);
+  const problems = [pages !== 1 && `it is ${pages} pages, not one`, same && 'it is identical to the master — not tailored']
+    .filter(Boolean) as string[];
+  return { pdf, pages, changed, master, problems };
+}
+
+/**
+ * `jobpipe autoapply [--limit 10] [--dry-run] [--id POSTING]`
+ *
+ * Applies, unattended, to the best queued postings that fit the lane in
+ * src/autoapply.ts: tailor → fact check → build → fill and submit through a
+ * headless browser → record. At most `--limit` submissions a day, counted
+ * across runs. Everything it did lands in out/auto-YYYY-MM-DD.md.
+ */
+async function cmdAutoapply(): Promise<void> {
+  const store = new Store(DB_PATH);
+  const today = new Date().toISOString().slice(0, 10);
+  const dryRun = has('dry-run');
+  const cap = Number(flag('limit', '10'));
+  const sentToday = store.query(`SELECT COUNT(*) n FROM auto_attempts WHERE outcome = 'submitted' AND attempted_at >= ?`, today)[0].n as number;
+  let room = cap - sentToday;
+  if (room <= 0) { console.log(`Daily cap reached: ${sentToday}/${cap} sent today.`); store.close(); return; }
+
+  // Both copies count: once the employer's copy is stored, a later screen keeps
+  // it and the feed copy goes, and the same job must not be attempted twice.
+  const tried = new Set(store.query('SELECT posting_id, employer_posting_id FROM auto_attempts')
+    .flatMap((r) => [r.posting_id, r.employer_posting_id]).filter(Boolean));
+  const only = flag('id');
+  const candidates = store.queue(200).filter((r) => (only ? r.id === only
+    : r.score >= 4 && r.ghost_risk === 'low' && r.remote_truth === 'us-remote' && !tried.has(r.id)));
+  if (!candidates.length) { console.log('Nothing in the queue fits the automatic lane.'); store.close(); return; }
+
+  const digest = join(ROOT, 'out', `auto-${today}${dryRun ? '-dry-run' : ''}.md`);
+  mkdirSync(dirname(digest), { recursive: true });
+  if (!existsSync(digest)) writeFileSync(digest, `# Automatic applications — ${today}\n\n`);
+  const log = (lines: string[]) => writeFileSync(digest, readFileSync(digest, 'utf8') + lines.join('\n') + '\n\n');
+  const record = (id: string, outcome: string, detail: string, employerId: string | null, folder: string | null) => {
+    // A dry run leaves no trace in the store, so it never blocks the real attempt.
+    if (dryRun) { console.log(`  → (dry run) ${outcome}: ${detail}`); return; }
+    store.db.prepare(`INSERT INTO auto_attempts (posting_id, attempted_at, outcome, detail, employer_posting_id, folder)
+      VALUES (?,?,?,?,?,?) ON CONFLICT(posting_id) DO UPDATE SET attempted_at=excluded.attempted_at,
+      outcome=excluded.outcome, detail=excluded.detail, employer_posting_id=excluded.employer_posting_id, folder=excluded.folder`)
+      .run(id, new Date().toISOString(), outcome, detail, employerId, folder);
+    console.log(`  → ${outcome}: ${detail}`);
+  };
+
+  const corpus = ['master-frontend.md', 'master-marketing.md', 'source.md']
+    .map((f) => join(RESUMES, f)).filter(existsSync).map((f) => readFileSync(f, 'utf8')).join('\n');
+  const answerBank = readFileSync(join(homedir(), 'job-search', 'profile.md'), 'utf8');
+  console.log(`${candidates.length} queued postings fit the lane; room for ${room} today${dryRun ? ' (dry run)' : ''}.`);
+
+  for (const c of candidates) {
+    if (room <= 0) break;
+    console.log(`\n${c.score}/5 ${c.company} — ${c.title}  (${c.id})`);
+
+    // 1. The employer's own copy: the feed's or the employer's board.
+    let emp: Posting | null = LANE_ATS.includes(c.ats) ? rehydrate(c) : null;
+    if (!emp) {
+      const found = await fetchAll(probeTargets(c.company), { concurrency: 3, timeoutMs: 20_000 });
+      emp = matchTitle(c.title, found.flatMap((r) => (r.ok ? r.postings : [])));
+      if (emp) store.upsertPostings([emp]);
+    }
+    if (!emp) { record(c.id, 'not-in-lane', `no copy on the employer's own Greenhouse, Lever or Ashby board`, null, null); continue; }
+    const screen = screenPosting(emp);
+    if (screen.verdict !== 'pass') { record(c.id, 'not-in-lane', `the employer's copy fails the screen: ${screen.reasons.join(', ')}`, emp.id, null); continue; }
+    const url = applyUrl(emp)!;
+    const already = store.query('SELECT 1 FROM applications WHERE posting_id = ? OR (company = ? AND role = ?)', emp.id, c.company, c.title);
+    if (already.length) { record(c.id, 'not-in-lane', 'already applied', emp.id, null); continue; }
+
+    // 2. Tailor, against the employer's full description.
+    const p = { ...c, description: emp.description || c.description, url };
+    const dir = applicationDir(p);
+    mkdirSync(join(dir, 'browser'), { recursive: true });
+    const track = trackFor(p.title);
+    const master = join(RESUMES, `master-${track}.md`);
+    const blockers = JSON.parse(p.blockers ?? '[]') as string[];
+    const postingMd = [`# ${p.company} — ${p.title}`, '', `- Posting id: \`${c.id}\` (employer copy \`${emp.id}\`)`, `- Apply: ${url}`,
+      `- Location: ${emp.location ?? 'not stated'}`, `- Pay: ${money(p.salary_min)}–${money(p.salary_max)}`, `- Track: ${track}`,
+      '', `## Judge's read\n\n${p.reasoning}${blockers.length ? `\n\nGaps: ${blockers.join('; ')}` : ''}`, '', '## Description', '', p.description].join('\n');
+    writeFileSync(join(dir, 'posting.md'), postingMd);
+    if (!existsSync(join(dir, 'resume.md'))) copyFileSync(master, join(dir, 'resume.md'));
+    writeFileSync(join(dir, '.jobpipe.json'), JSON.stringify({ postingId: c.id, employerPostingId: emp.id, track, master, auto: true }, null, 2));
+    const masterText = readFileSync(master, 'utf8');
+    try {
+      if (readFileSync(join(dir, 'resume.md'), 'utf8') === masterText) {
+        await claude(['-p', tailorPrompt(postingMd, masterText), '--allowedTools', 'Read', 'Edit', '--disallowedTools', 'Bash', 'Write'], dir, 600_000);
+      }
+    } catch (e: any) { record(c.id, 'tailor-failed', String(e.message ?? e).slice(0, 200), emp.id, dir); continue; }
+    const problems = factCheck(readFileSync(join(dir, 'resume.md'), 'utf8'), masterText, corpus);
+    let built: ReturnType<typeof buildResume> | null = null;
+    try { built = buildResume(p); problems.push(...built.problems); } catch (e: any) { problems.push(`build failed: ${String(e.message ?? e).slice(0, 120)}`); }
+    if (problems.length) { record(c.id, 'tailor-failed', problems.join('; '), emp.id, dir); log([`## ✗ ${c.company} — ${c.title}`, `Resume rejected: ${problems.join('; ')}. Left in ${dir} for you.`]); continue; }
+
+    // 3. Fill and submit, in a headless browser of its own.
+    const mcp = join(dir, 'browser', 'mcp.json');
+    writeFileSync(mcp, JSON.stringify({ mcpServers: { pw: { command: 'npx', args: ['-y', '@playwright/mcp@0.0.83', '--browser', 'chrome',
+      '--headless', '--isolated', '--output-dir', join(dir, 'browser'), '--viewport-size', '1280,2000'] } } }));
+    let out = '';
+    try {
+      out = await claude(['-p', applyPrompt({ company: p.company, title: p.title, url, pdf: built!.pdf, profile: answerBank,
+        posting: postingMd, shotsDir: join(dir, 'browser'), dryRun }),
+        '--mcp-config', mcp, '--strict-mcp-config', '--allowedTools', 'mcp__pw', '--disallowedTools', 'Bash', 'Write', 'Edit'],
+        homedir(), 1_200_000);
+    } catch (e: any) {
+      // It may have got as far as submitting. Never retried automatically.
+      record(c.id, 'unknown', `the browser run died (${String(e.message ?? e).slice(0, 120)}); check ${url} and your email`, emp.id, dir);
+      log([`## ? ${c.company} — ${c.title}`, `Run died partway; it may or may not have submitted. Check your email for a confirmation. ${url}`]);
+      continue;
+    }
+    writeFileSync(join(dir, 'browser', 'result.txt'), out);
+    const r = parseApplyResult(out);
+    if (!r) { record(c.id, 'unknown', 'unreadable reply; see browser/result.txt', emp.id, dir); continue; }
+    const answers = r.answers.map((a) => `- ${a.field}: ${a.value}${a.source === 'drafted' ? ' *(drafted)*' : ''}`);
+    const blanks = r.blank.map((b) => `- ${b.field} — left blank: ${b.why}`);
+    writeFileSync(join(dir, 'application.md'), [`# ${p.company} — ${p.title}`, '', `Status: ${r.status} — ${r.reason}`, `Page: ${r.finalUrl}`,
+      `Resume: ${built!.pdf}`, r.confirmation && `Confirmation: ${r.confirmation}`, '', '## Answers', ...answers, '', '## Left blank', ...blanks].filter((l) => l !== '').join('\n') + '\n');
+
+    if (confirmedSubmission(r) && !dryRun) {
+      room--;
+      record(c.id, 'submitted', r.confirmation.slice(0, 200), emp.id, dir);
+      const range = p.salary_min || p.salary_max ? `${money(p.salary_min)}-${money(p.salary_max)}` : null;
+      store.putApplication({ postingId: emp.id, company: p.company, role: p.title, track, postedRange: range, source: `jobpipe auto (${emp.ats})`,
+        url, appliedDate: today, status: 'applied', followUpDate: daysFrom(today, 7), resumePath: built!.pdf,
+        notes: `Auto-applied. Confirmation: ${r.confirmation.slice(0, 160)}` });
+      log([`## ✓ ${c.company} — ${c.title}`, `${money(p.salary_min)}–${money(p.salary_max)} · ${url}`, `Confirmation: ${r.confirmation}`,
+        `Resume: ${built!.pdf}`, ...answers, ...blanks]);
+    } else {
+      const outcome = r.status === 'submitted' ? 'unknown' : r.status;
+      record(c.id, outcome, r.reason || 'no confirmation seen', emp.id, dir);
+      log([`## ${outcome === 'unknown' ? '?' : '–'} ${c.company} — ${c.title}`, `${outcome}: ${r.reason} · ${url}`]);
+    }
+  }
+  console.log(`\nDigest: ${digest}`);
   store.close();
 }
 
 const COMMANDS: Record<string, () => void | Promise<void>> = {
   verify: cmdVerify, poll: cmdPoll, screen: cmdScreen,
   judge: cmdJudge, report: cmdReport, stats: cmdStats,
-  queue: cmdQueue, tailor: cmdTailor, build: cmdBuild, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
+  queue: cmdQueue, tailor: cmdTailor, build: cmdBuild, autoapply: cmdAutoapply, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
 };
 
 const command = process.argv[2];
@@ -421,6 +562,7 @@ if (!command || !COMMANDS[command]) {
   jobpipe verify  [--bulk] [--ats A]               check every board still answers
   jobpipe tailor  <posting-id> [--track frontend|marketing]   set up the application folder
   jobpipe build   <posting-id>                     render the resume, check one page + tailored
+  jobpipe autoapply [--limit 10] [--dry-run] [--id P]  tailor, fill and submit within the lane, unattended
   jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT] [--status S]
   jobpipe import-csv [--from PATH]                 load the tracker CSV into the store
   jobpipe export-csv [--out PATH]                  write applications back out as CSV

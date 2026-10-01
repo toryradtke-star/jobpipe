@@ -90,6 +90,18 @@ CREATE TABLE IF NOT EXISTS applications (
 );
 CREATE INDEX IF NOT EXISTS applications_posting ON applications(posting_id);
 
+-- Every automatic application attempt, whatever came of it. A posting with a
+-- row here is never attempted again automatically: an attempt that timed out
+-- may still have submitted, and applying twice is worse than not at all.
+CREATE TABLE IF NOT EXISTS auto_attempts (
+  posting_id TEXT PRIMARY KEY REFERENCES postings(id),
+  attempted_at TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  detail TEXT NOT NULL,
+  employer_posting_id TEXT,
+  folder TEXT
+);
+
 -- Small facts the CLI remembers between runs, e.g. when the last report ran.
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS applications_company_role ON applications(company, role);
