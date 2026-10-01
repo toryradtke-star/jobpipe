@@ -15,7 +15,8 @@
  *   import-csv  load ~/job-search/applications.csv into the store
  *   export-csv  write the store's applications back out as that CSV
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +35,8 @@ const PROFILE_DIR = env('PROFILE') ?? join(ROOT, 'profile');
 const REGISTRY = env('REGISTRY') ?? join(ROOT, 'companies.json');
 const BULK_REGISTRY = env('BULK_REGISTRY') ?? join(ROOT, 'data', 'companies-bulk.json');
 const TRACKER = env('TRACKER') ?? join(homedir(), 'job-search', 'applications.csv');
+const RESUMES = env('RESUMES') ?? join(homedir(), 'job-search', 'resume');
+const APPLICATIONS = env('APPLICATIONS') ?? join(homedir(), 'job-search', 'applications');
 
 /**
  * The curated registry, plus the bulk one when `--bulk` is passed. Bulk is
@@ -317,10 +320,91 @@ function cmdExportCsv(): void {
   store.close();
 }
 
+const kebab = (v: string) => v.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/** Engineering-flavored titles get the frontend master; everything else the marketing one. */
+function trackFor(title: string): 'frontend' | 'marketing' {
+  return /\b(engineer|developer|technologist|architect|programmer|devrel|advocate)\b/i.test(title) ? 'frontend' : 'marketing';
+}
+
+function applicationDir(p: Record<string, any>): string {
+  return join(APPLICATIONS, `${kebab(p.company)}-${kebab(p.title)}`.slice(0, 80).replace(/-$/, ''));
+}
+
+function postingRow(store: Store, id: string | undefined): Record<string, any> {
+  if (!id || id.startsWith('--')) { console.error(`Usage: jobpipe ${process.argv[2]} <posting-id>`); process.exit(1); }
+  const p = store.query(`SELECT p.*, j.rating, j.score, j.reasoning, j.blockers, j.remote_truth, j.remote_evidence
+    FROM postings p LEFT JOIN judgments j ON j.posting_id = p.id WHERE p.id = ?`, id)[0];
+  if (!p) { console.error(`No posting ${id}.`); process.exit(1); }
+  return p;
+}
+
+/**
+ * `jobpipe tailor <posting-id> [--track frontend|marketing]`
+ *
+ * Sets up the application folder: the posting in full (what the resume is
+ * tailored against) and a copy of the right master to edit. It never
+ * overwrites a resume.md already there — that is someone's tailoring work.
+ */
+function cmdTailor(): void {
+  const store = new Store(DB_PATH);
+  const p = postingRow(store, process.argv[3]);
+  const track = (flag('track') ?? trackFor(p.title)) as 'frontend' | 'marketing';
+  const dir = applicationDir(p);
+  mkdirSync(dir, { recursive: true });
+  const blockers = JSON.parse(p.blockers ?? '[]') as string[];
+  writeFileSync(join(dir, 'posting.md'), [
+    `# ${p.company} — ${p.title}`, '',
+    `- Posting id: \`${p.id}\``, `- URL: ${p.url}`, `- Location: ${p.location ?? 'not stated'}`,
+    `- Pay: ${money(p.salary_min)}–${money(p.salary_max)}`, `- Track: ${track} (master-${track}.md)`,
+    p.rating ? `- Judged: ${p.score ?? '?'}/5 ${p.rating} — remote ${p.remote_truth ?? '?'}` : '- Not judged yet',
+    '', p.reasoning ? `## Judge's read\n\n${p.reasoning}\n${blockers.length ? `\nGaps to address or own: ${blockers.join('; ')}\n` : ''}${p.remote_evidence ? `\nRemote evidence: ${p.remote_evidence}\n` : ''}` : '',
+    '## Description', '', p.description, '',
+  ].join('\n'));
+  const resume = join(dir, 'resume.md');
+  const master = join(RESUMES, `master-${track}.md`);
+  if (existsSync(resume)) console.log(`Kept existing ${resume}.`);
+  else { copyFileSync(master, resume); console.log(`Copied master-${track}.md → ${resume}`); }
+  writeFileSync(join(dir, '.jobpipe.json'), JSON.stringify({ postingId: p.id, track, master }, null, 2));
+  console.log(`Posting written to ${join(dir, 'posting.md')}.`);
+  console.log(`Next: edit resume.md against posting.md — wording and emphasis only, never new facts — then \`jobpipe build ${p.id}\`.`);
+  store.close();
+}
+
+/**
+ * `jobpipe build <posting-id>` — renders resume.md and checks the result is
+ * fit to send: one page, and actually tailored (it differs from the master).
+ * The Carbon Arc application went out with the master PDF; this is the check
+ * that would have caught it.
+ */
+function cmdBuild(): void {
+  const store = new Store(DB_PATH);
+  const p = postingRow(store, process.argv[3]);
+  const dir = applicationDir(p);
+  const resume = join(dir, 'resume.md');
+  if (!existsSync(resume)) { console.error(`No ${resume}. Run \`jobpipe tailor ${p.id}\` first.`); process.exit(1); }
+  const meta = existsSync(join(dir, '.jobpipe.json')) ? JSON.parse(readFileSync(join(dir, '.jobpipe.json'), 'utf8')) : {};
+  const master = meta.master ?? join(RESUMES, `master-${trackFor(p.title)}.md`);
+  execFileSync('python3', [join(RESUMES, 'build.py'), resume], { stdio: 'inherit' });
+  const pdf = join(dir, 'resume.pdf');
+  const pages = Number(/Pages:\s+(\d+)/.exec(execFileSync('pdfinfo', [pdf], { encoding: 'utf8' }))?.[1]);
+  const same = readFileSync(resume, 'utf8') === readFileSync(master, 'utf8');
+  let changed = 0;
+  try { execFileSync('diff', ['-u', master, resume]); } catch (e: any) {
+    changed = String(e.stdout ?? '').split('\n')
+      .filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l)).length;
+  }
+  console.log(`${pdf}: ${pages} page${pages === 1 ? '' : 's'}, ${changed} lines changed from ${master.split('/').pop()}.`);
+  const problems = [pages !== 1 && `it is ${pages} pages, not one`, same && 'it is identical to the master — not tailored'].filter(Boolean);
+  if (problems.length) { console.error(`NOT READY: ${problems.join('; ')}.`); process.exitCode = 1; }
+  else console.log(`Ready to attach: ${pdf}`);
+  store.close();
+}
+
 const COMMANDS: Record<string, () => void | Promise<void>> = {
   verify: cmdVerify, poll: cmdPoll, screen: cmdScreen,
   judge: cmdJudge, report: cmdReport, stats: cmdStats,
-  queue: cmdQueue, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
+  queue: cmdQueue, tailor: cmdTailor, build: cmdBuild, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
 };
 
 const command = process.argv[2];
@@ -335,11 +419,14 @@ if (!command || !COMMANDS[command]) {
   jobpipe queue   [--limit 5]                      best judged postings not yet applied to
   jobpipe stats                                    what the store holds
   jobpipe verify  [--bulk] [--ats A]               check every board still answers
+  jobpipe tailor  <posting-id> [--track frontend|marketing]   set up the application folder
+  jobpipe build   <posting-id>                     render the resume, check one page + tailored
   jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT] [--status S]
   jobpipe import-csv [--from PATH]                 load the tracker CSV into the store
   jobpipe export-csv [--out PATH]                  write applications back out as CSV
 
-Env: JOBPIPE_DB, JOBPIPE_PROFILE, JOBPIPE_REGISTRY, JOBPIPE_TRACKER (JOBFEED_* still read)`);
+Env: JOBPIPE_DB, JOBPIPE_PROFILE, JOBPIPE_REGISTRY, JOBPIPE_TRACKER, JOBPIPE_RESUMES,
+     JOBPIPE_APPLICATIONS (JOBFEED_* still read)`);
   process.exit(command ? 1 : 0);
 }
 await COMMANDS[command]();
