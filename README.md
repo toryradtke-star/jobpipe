@@ -77,7 +77,7 @@ CSV tracker.
 ## Install
 
 ```bash
-npm install -g jobpipe     # Node 22.18+
+npm install -g @toryr/jobpipe     # Node 22.18+; the command is `jobpipe`
 jobpipe init               # starter profile files in ~/.jobpipe/profile
 ```
 

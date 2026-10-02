@@ -1,5 +1,5 @@
 {
-  "name": "jobpipe",
+  "name": "@toryr/jobpipe",
   "version": "0.1.0",
   "description": "Your job search as a pipeline: poll employer job boards directly, screen against your own rules, have Claude judge what survives, tailor a fact-checked resume, and track it. Node 22 + SQLite, zero dependencies.",
   "keywords": [
