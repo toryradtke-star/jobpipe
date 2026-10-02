@@ -4,6 +4,7 @@
  * survives, and track what you applied to.
  *
  * Each command does one thing:
+ *   init     create starter profile files
  *   verify   check every board in the registry still answers
  *   poll     fetch every board and store what is new
  *   screen   apply the deterministic rule-outs to everything unscreened
@@ -13,7 +14,7 @@
  *   stats    what the store holds right now
  *   autoapply   tailor, fill and submit the best queued postings, unattended
  *   applied     record an application against a posting
- *   import-csv  load ~/job-search/applications.csv into the store
+ *   import-csv  load the tracker CSV into the store
  *   export-csv  write the store's applications back out as that CSV
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
@@ -31,15 +32,28 @@ import type { Company, Posting } from '../src/types.ts';
 import { LANE_ATS, applyPrompt, applyUrl, claude, confirmedSubmission, factCheck, matchTitle, parseApplyResult,
   probeTargets, tailorPrompt } from '../src/autoapply.ts';
 
+// ROOT is the code (and the bundled registry). HOME is your data: beside the
+// code in a git checkout, ~/.jobpipe for an npm install, which has nowhere
+// else to write.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const env = (name: string) => process.env[`JOBPIPE_${name}`] ?? process.env[`JOBFEED_${name}`];
-const DB_PATH = env('DB') ?? join(ROOT, 'data', 'jobpipe.db');
-const PROFILE_DIR = env('PROFILE') ?? join(ROOT, 'profile');
-const REGISTRY = env('REGISTRY') ?? join(ROOT, 'companies.json');
-const BULK_REGISTRY = env('BULK_REGISTRY') ?? join(ROOT, 'data', 'companies-bulk.json');
-const TRACKER = env('TRACKER') ?? join(homedir(), 'job-search', 'applications.csv');
-const RESUMES = env('RESUMES') ?? join(homedir(), 'job-search', 'resume');
-const APPLICATIONS = env('APPLICATIONS') ?? join(homedir(), 'job-search', 'applications');
+const HOME = env('HOME') ?? (existsSync(join(ROOT, '.git')) ? ROOT : join(homedir(), '.jobpipe'));
+const DB_PATH = env('DB') ?? join(HOME, 'data', 'jobpipe.db');
+const PROFILE_DIR = env('PROFILE') ?? join(HOME, 'profile');
+const REGISTRY = env('REGISTRY') ?? [join(HOME, 'companies.json'), join(ROOT, 'companies.json')].find(existsSync)!;
+const BULK_REGISTRY = env('BULK_REGISTRY') ?? join(HOME, 'data', 'companies-bulk.json');
+const OUT = join(HOME, 'out');
+
+/** Where the files outside the store live, from profile/config.json; a leading ~ is your home directory. */
+const config = (() => {
+  const path = join(PROFILE_DIR, 'config.json');
+  const own = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, string> : {};
+  return (key: string, fallback: string) => (own[key] ?? fallback).replace(/^~(?=\/|$)/, homedir());
+})();
+const TRACKER = env('TRACKER') ?? config('tracker', join(HOME, 'applications.csv'));
+const RESUMES = env('RESUMES') ?? config('resumes', join(HOME, 'resume'));
+const APPLICATIONS = env('APPLICATIONS') ?? config('applications', join(HOME, 'applications'));
+const ANSWERS = env('ANSWERS') ?? config('answers', join(PROFILE_DIR, 'answers.md'));
 
 /**
  * The curated registry, plus the bulk one when `--bulk` is passed. Bulk is
@@ -240,7 +254,7 @@ function cmdReport(): void {
     if (r.rating !== heading) { heading = r.rating; out.push(`## All ${heading}`, ''); }
     out.push(...entry(r));
   }
-  const path = flag('out', join(ROOT, 'out', `${today}.md`))!;
+  const path = flag('out', join(OUT, `${today}.md`))!;
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, out.join('\n'));
   if (!has('out')) store.setMeta('last_report', new Date().toISOString());
@@ -447,7 +461,7 @@ async function cmdAutoapply(): Promise<void> {
     : r.score >= 4 && r.ghost_risk === 'low' && r.remote_truth === 'us-remote' && !tried.has(r.id)));
   if (!candidates.length) { console.log('Nothing in the queue fits the automatic lane.'); store.close(); return; }
 
-  const digest = join(ROOT, 'out', `auto-${today}${dryRun ? '-dry-run' : ''}.md`);
+  const digest = join(OUT, `auto-${today}${dryRun ? '-dry-run' : ''}.md`);
   mkdirSync(dirname(digest), { recursive: true });
   if (!existsSync(digest)) writeFileSync(digest, `# Automatic applications — ${today}\n\n`);
   const log = (lines: string[]) => writeFileSync(digest, readFileSync(digest, 'utf8') + lines.join('\n') + '\n\n');
@@ -463,7 +477,7 @@ async function cmdAutoapply(): Promise<void> {
 
   const corpus = ['master-frontend.md', 'master-marketing.md', 'source.md']
     .map((f) => join(RESUMES, f)).filter(existsSync).map((f) => readFileSync(f, 'utf8')).join('\n');
-  const answerBank = readFileSync(join(homedir(), 'job-search', 'profile.md'), 'utf8');
+  const answerBank = readFileSync(ANSWERS, 'utf8');
   console.log(`${candidates.length} queued postings fit the lane; room for ${room} today${dryRun ? ' (dry run)' : ''}.`);
 
   for (const c of candidates) {
@@ -551,8 +565,30 @@ async function cmdAutoapply(): Promise<void> {
   store.close();
 }
 
+/** Starter profile files for a new user; never overwrites one that exists. */
+function cmdInit() {
+  const starters: Record<string, string> = {
+    'constraints.md': '# Hard rule-outs\n\nWhat you will never take, one per line: on-site, a state you cannot work in, a level, a pay floor in words.\n',
+    'background.md': '# Background\n\nWho you are, what you have shipped, what you are after, and your honest gaps.\nThe gaps matter: without them the judge calls everything a maybe.\n',
+    'rules.json': JSON.stringify({ payFloor: 0 }, null, 2) + '\n',
+    'answers.md': '# Answer bank\n\nFor autoapply: name, email, phone, location, links (say "skip" for any to leave blank),\nwork authorization, desired salary, notice period, and anything forms usually ask.\n',
+    'config.json': JSON.stringify({ tracker: join(HOME, 'applications.csv'), resumes: join(HOME, 'resume'),
+      applications: join(HOME, 'applications'), answers: join(PROFILE_DIR, 'answers.md') }, null, 2) + '\n',
+  };
+  mkdirSync(PROFILE_DIR, { recursive: true });
+  for (const [name, body] of Object.entries(starters)) {
+    const path = join(PROFILE_DIR, name);
+    if (existsSync(path)) { console.log(`kept    ${path}`); continue; }
+    writeFileSync(path, body);
+    console.log(`created ${path}`);
+  }
+  console.log(`\nEdit those, then: jobpipe poll && jobpipe screen && jobpipe judge --limit 20 && jobpipe report
+Judging, tailoring and autoapply call the \`claude\` CLI (Claude Code). tailor/build expect
+master-frontend.md, master-marketing.md and a build.py (markdown → one-page PDF) in ${RESUMES}.`);
+}
+
 const COMMANDS: Record<string, () => void | Promise<void>> = {
-  verify: cmdVerify, poll: cmdPoll, screen: cmdScreen,
+  init: cmdInit, verify: cmdVerify, poll: cmdPoll, screen: cmdScreen,
   judge: cmdJudge, report: cmdReport, stats: cmdStats,
   queue: cmdQueue, tailor: cmdTailor, build: cmdBuild, autoapply: cmdAutoapply, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
 };
@@ -561,6 +597,7 @@ const command = process.argv[2];
 if (!command || !COMMANDS[command]) {
   console.log(`jobpipe — find, judge and track job postings
 
+  jobpipe init                                     create starter profile files
   jobpipe poll    [--bulk] [--scrape] [--ats workday] [--tag saas] [--concurrency 4]
                                                    fetch every board, store what is new
   jobpipe screen  [--all]                          apply the deterministic rule-outs
@@ -576,8 +613,9 @@ if (!command || !COMMANDS[command]) {
   jobpipe import-csv [--from PATH]                 load the tracker CSV into the store
   jobpipe export-csv [--out PATH]                  write applications back out as CSV
 
-Env: JOBPIPE_DB, JOBPIPE_PROFILE, JOBPIPE_REGISTRY, JOBPIPE_TRACKER, JOBPIPE_RESUMES,
-     JOBPIPE_APPLICATIONS (JOBFEED_* still read)`);
+Data lives beside a git checkout, or in ~/.jobpipe for an npm install.
+Env: JOBPIPE_HOME, JOBPIPE_DB, JOBPIPE_PROFILE, JOBPIPE_REGISTRY, JOBPIPE_TRACKER,
+     JOBPIPE_RESUMES, JOBPIPE_APPLICATIONS, JOBPIPE_ANSWERS (JOBFEED_* still read)`);
   process.exit(command ? 1 : 0);
 }
 await COMMANDS[command]();

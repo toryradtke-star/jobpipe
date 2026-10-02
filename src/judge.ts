@@ -77,9 +77,9 @@ ${p.description.slice(0, DESCRIPTION_CHARS)}
 - Screen flags to settle: ${ctx.flags.length ? ctx.flags.join(', ') : 'none'}${ctx.flags.includes('us-not-stated') ? ' (the posting is remote but never names a country — decide from the text whether US candidates are eligible)' : ''}
 
 ## How to judge
-1. Remote truth. Job boards label roles "remote" that are not. Read the whole description for on-site days, relocation, a required metro, a state list, or timezone limits. Minnesota-based candidates fail a state list that leaves out MN. Quote the words that decide it.
+1. Remote truth. Job boards label roles "remote" that are not. Read the whole description for on-site days, relocation, a required metro, a state list, or timezone limits. A candidate fails a state list that leaves out the state they live in (from the background). Quote the words that decide it.
 2. Ghost risk. A posting that is very old, no longer listed, reposted again and again, or written so generically that no team could be behind it is likely not being hired for.
-3. Title leverage. The same skills are paid ~$65k under marketing-coordinator titles and $120k+ under engineering-style GTM titles (GTM Engineer, Growth Engineer, Marketing Engineer, AI Automation Engineer). Score how far this title moves the candidate toward the engineering-style band.
+3. Title leverage. The same skills are often paid very differently depending on the title. Score how far this title moves the candidate toward the best-paid titles their background fits; the background may name them.
 
 ## Your answer
 Reply with ONE JSON object and nothing else. No markdown fence, no commentary.

@@ -1,21 +1,47 @@
 {
   "name": "jobpipe",
   "version": "0.1.0",
-  "private": true,
+  "description": "Your job search as a pipeline: poll employer job boards directly, screen against your own rules, have Claude judge what survives, tailor a fact-checked resume, and track it. Node 22 + SQLite, zero dependencies.",
+  "keywords": [
+    "job-search",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "workday",
+    "claude",
+    "cli",
+    "sqlite"
+  ],
+  "author": "Tory Radtke (https://toryradtke.com)",
+  "license": "MIT",
+  "homepage": "https://github.com/toryradtke-star/jobpipe#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/toryradtke-star/jobpipe.git"
+  },
+  "bugs": {
+    "url": "https://github.com/toryradtke-star/jobpipe/issues"
+  },
   "type": "module",
-  "description": "A personal job-posting collector: polls company ATS boards directly, screens against your own rules, and judges what survives.",
   "engines": {
     "node": ">=22.18"
   },
   "bin": {
-    "jobpipe": "./bin/jobpipe.ts"
+    "jobpipe": "dist/bin/jobpipe.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "poll": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts poll",
     "screen": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts screen",
     "judge": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts judge",
     "report": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts report",
     "verify": "node --disable-warning=ExperimentalWarning bin/jobpipe.ts verify",
-    "test": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\""
+    "test": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
+    "build": "node --disable-warning=ExperimentalWarning scripts/build.ts",
+    "prepublishOnly": "npm test && npm run build"
   }
 }

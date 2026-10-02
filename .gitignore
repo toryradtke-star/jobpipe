@@ -7,3 +7,4 @@ profile/
 out/
 applications/
 .venv/
+dist/

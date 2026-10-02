@@ -74,23 +74,39 @@ identical to the master.
 **track** — applications keyed on company + role, synced byte-for-byte with a
 CSV tracker.
 
-## Running it
-
-Personal files live in `profile/` (gitignored): `constraints.md` (hard
-rule-outs), `background.md` (who you are, including honest gaps — those are
-what stop the judge calling everything a maybe), and `rules.json` (`payFloor`).
+## Install
 
 ```bash
-./bin/jobpipe.ts poll [--scrape] [--bulk]
-./bin/jobpipe.ts screen [--all]
-./bin/jobpipe.ts judge --limit 40
-./bin/jobpipe.ts report            # out/YYYY-MM-DD.md, with "new since last report"
-./bin/jobpipe.ts queue
-./bin/jobpipe.ts tailor <id> && ./bin/jobpipe.ts build <id>
-./bin/jobpipe.ts autoapply --dry-run
-npm test
+npm install -g jobpipe     # Node 22.18+
+jobpipe init               # starter profile files in ~/.jobpipe/profile
 ```
 
+Polling and screening need nothing else. Judging, tailoring and autoapply call
+the `claude` CLI ([Claude Code](https://claude.com/claude-code)); Indeed needs
+[uv](https://docs.astral.sh/uv/).
+
+Your files live in `profile/`: `constraints.md` (hard rule-outs),
+`background.md` (who you are, including honest gaps — those are what stop the
+judge calling everything a maybe), `rules.json` (`payFloor`), `answers.md`
+(what application forms ask), and `config.json` (where the tracker CSV,
+resumes and application folders go). An npm install keeps all of it, and the
+store, in `~/.jobpipe` (`JOBPIPE_HOME` moves it); a git checkout keeps it
+beside the code, gitignored.
+
+## Running it
+
+```bash
+jobpipe poll [--scrape] [--bulk]
+jobpipe screen [--all]
+jobpipe judge --limit 40
+jobpipe report            # out/YYYY-MM-DD.md, with "new since last report"
+jobpipe queue
+jobpipe tailor <id> && jobpipe build <id>
+jobpipe autoapply --dry-run
+```
+
+From a checkout, run `./bin/jobpipe.ts` directly — no build step; `npm test`
+runs the tests and `npm run build` makes the npm package.
 `scripts/scheduled-run.sh` is the daily run for a systemd user timer.
 
 ## Registry

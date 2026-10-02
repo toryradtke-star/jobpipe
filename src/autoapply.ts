@@ -146,7 +146,7 @@ export type ApplyResult = {
 export function applyPrompt(o: {
   company: string; title: string; url: string; pdf: string; profile: string; posting: string; shotsDir: string; dryRun: boolean;
 }): string {
-  return `You are submitting one job application on the candidate's behalf, unattended. The candidate (Tory Radtke) has authorized automatic submission within the rules below. Nobody is watching; when a rule says stop, stop and report.
+  return `You are submitting one job application on the candidate's behalf, unattended. The candidate has authorized automatic submission within the rules below. Nobody is watching; when a rule says stop, stop and report.
 
 Role: ${o.company} — ${o.title}
 Application page: ${o.url}
@@ -157,7 +157,7 @@ Resume PDF to upload (the only file you may attach): ${o.pdf}
 - The form asks you to create an account, sign in, or enter a password.
 - A CAPTCHA or bot check appears that is not passed automatically.
 - It asks for SSN, government ID, date of birth, bank or card details.
-- A question or the posting requires on-site or hybrid work, relocation, living in a specific metro, or a state list without Minnesota. Do not answer around it.
+- A question or the posting requires on-site or hybrid work, relocation, living in a specific metro, or a state list without the candidate's state (the location in the answer bank). Do not answer around it.
 - A required question would need a false answer from the candidate's facts (e.g. a required license, clearance, or years of experience they do not have).
 
 ## Filling
@@ -165,7 +165,7 @@ Resume PDF to upload (the only file you may attach): ${o.pdf}
 - A required question the answer bank does not cover: draft a short, truthful answer from the candidate's background in posting.md and the answer bank. Never invent experience, employers, numbers or credentials. Mark it "drafted".
 - Optional free-text questions (cover letter, "anything else"): leave blank unless required.
 - EEO, demographic and voluntary self-identification questions (gender, race, ethnicity, veteran, disability, pronouns, sexual orientation): ALWAYS leave blank or choose "decline to answer" if a choice is forced.
-- LinkedIn: leave blank. Website/portfolio: https://toryradtke.com. GitHub: https://github.com/toryradtke-star.
+- Links (LinkedIn, website/portfolio, GitHub): exactly as the answer bank gives them; leave blank any it says to skip or does not give.
 - Upload ${o.pdf} with browser_file_upload as the resume. Never any other file.
 - Fill with browser_fill_form / browser_type WITHOUT submit:true. Never press Enter in a field.
 - Before submitting, take a full-page screenshot to ${o.shotsDir}/filled.png and re-read the form with browser_snapshot to confirm every required field is set and the resume filename is attached.
