@@ -156,10 +156,12 @@ export class Store {
     const judgeCols = new Set((this.db.prepare('PRAGMA table_info(judgments)').all() as { name: string }[]).map((c) => c.name));
     for (const [col, def] of [['score', 'INTEGER'], ['subscores', "TEXT NOT NULL DEFAULT '{}'"],
       ['remote_truth', 'TEXT'], ['remote_evidence', 'TEXT'], ['ghost_risk', 'TEXT'],
-      ['ghost_signals', "TEXT NOT NULL DEFAULT '[]'"]] as const) {
+      ['ghost_signals', "TEXT NOT NULL DEFAULT '[]'"], ['tier', 'TEXT'], ['est_pay', 'INTEGER']] as const) {
       if (!judgeCols.has(col)) this.db.exec(`ALTER TABLE judgments ADD COLUMN ${col} ${def}`);
     }
     this.db.exec('CREATE INDEX IF NOT EXISTS judgments_score ON judgments(score)');
+    // The queue asks "is this still listed on its board" per row; without this it scans every posting.
+    this.db.exec('CREATE INDEX IF NOT EXISTS postings_board_seen ON postings(ats, slug, last_seen)');
   }
 
   /**
@@ -214,17 +216,17 @@ export class Store {
   putJudgment(j: Judgment): void {
     this.db.prepare(`
       INSERT INTO judgments (posting_id, rating, reasoning, blockers, judged_at, model,
-        score, subscores, remote_truth, remote_evidence, ghost_risk, ghost_signals)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        score, subscores, remote_truth, remote_evidence, ghost_risk, ghost_signals, tier, est_pay)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(posting_id) DO UPDATE SET
         rating = excluded.rating, reasoning = excluded.reasoning,
         blockers = excluded.blockers, judged_at = excluded.judged_at, model = excluded.model,
         score = excluded.score, subscores = excluded.subscores, remote_truth = excluded.remote_truth,
         remote_evidence = excluded.remote_evidence, ghost_risk = excluded.ghost_risk,
-        ghost_signals = excluded.ghost_signals
+        ghost_signals = excluded.ghost_signals, tier = excluded.tier, est_pay = excluded.est_pay
     `).run(j.postingId, j.rating, j.reasoning, JSON.stringify(j.blockers), j.judgedAt, j.model,
       j.score, JSON.stringify(j.subscores), j.remoteTruth, j.remoteEvidence, j.ghostRisk,
-      JSON.stringify(j.ghostSignals));
+      JSON.stringify(j.ghostSignals), j.tier ?? null, j.estPay ?? null);
   }
 
   /**
@@ -304,11 +306,12 @@ export class Store {
    * from somewhere jobpipe never polled. Closed postings, high ghost risk and
    * remote claims the judge did not believe are left out.
    */
-  queue(limit: number): Record<string, any>[] {
+  queue(limit: number, tier?: string): Record<string, any>[] {
     const applied = new Set((this.db.prepare('SELECT company, role FROM applications').all() as Record<string, string>[])
       .map((a) => fingerprint(a.company, a.role)));
     const rows = this.query(`
-      SELECT p.*, j.rating, j.score, j.subscores, j.remote_truth, j.remote_evidence, j.ghost_risk, j.reasoning, j.blockers
+      SELECT p.*, j.rating, j.score, j.subscores, j.remote_truth, j.remote_evidence, j.ghost_risk, j.reasoning, j.blockers,
+        j.tier, j.est_pay
       FROM postings p JOIN judgments j ON j.posting_id = p.id
       JOIN screens s ON s.posting_id = p.id AND s.verdict = 'pass'
       WHERE j.rating IN ('STRONG','FAIR')
@@ -316,9 +319,10 @@ export class Store {
         AND COALESCE(j.remote_truth, 'us-remote') IN ('us-remote','state-restricted')
         AND p.last_seen >= (SELECT datetime(MAX(last_seen), '-1 day') FROM postings q WHERE q.ats = p.ats AND q.slug = p.slug)
         AND p.id NOT IN (SELECT posting_id FROM applications WHERE posting_id IS NOT NULL)
+        AND (? IS NULL OR j.tier = ?)
       ORDER BY COALESCE(j.score, CASE j.rating WHEN 'STRONG' THEN 4 ELSE 3 END) DESC,
                CASE j.rating WHEN 'STRONG' THEN 0 ELSE 1 END,
-               COALESCE(p.posted_at, p.first_seen) DESC`);
+               COALESCE(p.posted_at, p.first_seen) DESC`, tier ?? null, tier ?? null);
     return rows.filter((r) => !applied.has(r.fingerprint)).slice(0, limit);
   }
 

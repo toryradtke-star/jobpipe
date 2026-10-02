@@ -87,6 +87,14 @@ export type Judgment = {
   remoteEvidence: string;
   ghostRisk: 'low' | 'medium' | 'high' | null;
   ghostSignals: string[];
+  /**
+   * Which bucket this belongs in: '75k' (qualified now, pay around $75–95k),
+   * '100k' (realistic, around $95–125k), 'stretch' (asks well past the candidate
+   * or pays $125k+ with a level gap). Null on judgments made before tiers existed.
+   */
+  tier: '75k' | '100k' | 'stretch' | null;
+  /** Base pay the judge expects: the stated midpoint, or its estimate when unstated. */
+  estPay: number | null;
   judgedAt: string;
   model: string;
 };

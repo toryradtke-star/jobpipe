@@ -26,6 +26,32 @@ import { extractJson } from './judge.ts';
 
 const run = promisify(execFile);
 
+/**
+ * Whether a judged posting is good enough to apply to unattended. Strong fits
+ * qualify at any tier; a fair fit (3/5) qualifies in the two realistic tiers
+ * when the judge named nothing that would block it, since there the gap is
+ * usually pay or title leverage rather than whether the candidate can do the job.
+ */
+export function inLane(r: { score: number | null; tier?: string | null; blockers?: string | null; ghost_risk?: string | null; remote_truth?: string | null }): boolean {
+  if (r.ghost_risk !== 'low' || r.remote_truth !== 'us-remote') return false;
+  if ((r.score ?? 0) >= 4) return true;
+  const blockers = JSON.parse(r.blockers ?? '[]') as string[];
+  return (r.score ?? 0) >= 3 && (r.tier === '75k' || r.tier === '100k') && blockers.length === 0;
+}
+
+/**
+ * Round-robin across tiers ($75k, $100k, stretch, then untiered), keeping each
+ * tier's own best-first order, so a day's applications are a mix rather than
+ * all from whichever tier happens to score highest.
+ */
+export function mixTiers<T extends { tier?: string | null }>(rows: T[]): T[] {
+  const order = ['75k', '100k', 'stretch', ''];
+  const lanes = order.map((t) => rows.filter((r) => (r.tier ?? '') === t));
+  const out: T[] = [];
+  for (let i = 0; out.length < rows.length; i++) for (const lane of lanes) if (lane[i]) out.push(lane[i]);
+  return out;
+}
+
 export const LANE_ATS: Ats[] = ['greenhouse', 'lever', 'ashby'];
 
 /** Board slugs an employer is likely to use, most likely first. */

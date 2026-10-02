@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { applyUrl, confirmedSubmission, factCheck, matchTitle, parseApplyResult, slugCandidates, type ApplyResult } from './autoapply.ts';
+import { applyUrl, confirmedSubmission, factCheck, inLane, mixTiers, matchTitle, parseApplyResult, slugCandidates, type ApplyResult } from './autoapply.ts';
 import type { Posting } from './types.ts';
 
 // A made-up candidate, so the tests run anywhere and publish nothing personal.
@@ -97,4 +97,18 @@ test('the apply reply is parsed out of surrounding text', () => {
   const out = parseApplyResult('Done.\n{"status":"skipped","reason":"asks for a password","finalUrl":"","confirmation":"","answers":[],"blank":[]}');
   assert.equal(out?.status, 'skipped');
   assert.equal(parseApplyResult('no json here'), null);
+});
+
+test('a strong fit is in the lane at any tier; a fair one only in the realistic tiers with no blockers', () => {
+  const base = { ghost_risk: 'low', remote_truth: 'us-remote', blockers: '[]' };
+  assert.equal(inLane({ ...base, score: 4, tier: 'stretch' }), true);
+  assert.equal(inLane({ ...base, score: 3, tier: '75k' }), true);
+  assert.equal(inLane({ ...base, score: 3, tier: 'stretch' }), false);
+  assert.equal(inLane({ ...base, score: 3, tier: '100k', blockers: '["no HubSpot"]' }), false);
+  assert.equal(inLane({ ...base, score: 5, tier: '75k', ghost_risk: 'medium' }), false);
+});
+
+test('tiers are interleaved, each keeping its own order', () => {
+  const rows = [{ id: 's1', tier: 'stretch' }, { id: 'a1', tier: '75k' }, { id: 's2', tier: 'stretch' }, { id: 'b1', tier: '100k' }, { id: 'a2', tier: '75k' }, { id: 'u1', tier: null }];
+  assert.deepEqual(mixTiers(rows).map((r) => r.id), ['a1', 'b1', 's1', 'u1', 'a2', 's2']);
 });

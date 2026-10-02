@@ -31,7 +31,7 @@ import { fingerprint, preferred, SOURCE_RANK } from '../src/dedupe.ts';
 import { judgePosting, type Profile } from '../src/judge.ts';
 import type { Company, Posting } from '../src/types.ts';
 import { LANE_ATS, applyPrompt, applyUrl, claude, confirmedSubmission, factCheck, matchTitle, parseApplyResult,
-  probeTargets, tailorPrompt } from '../src/autoapply.ts';
+  probeTargets, tailorPrompt, inLane, mixTiers } from '../src/autoapply.ts';
 
 // ROOT is the code (and the bundled registry). HOME is your data: beside the
 // code in a git checkout, ~/.jobpipe for an npm install, which has nowhere
@@ -185,7 +185,9 @@ function rehydrate(r: Record<string, any>): Posting {
 async function cmdJudge(): Promise<void> {
   const store = new Store(DB_PATH);
   const limit = Number(flag('limit', '20'));
-  const queue = store.unjudged(limit, flag('id'));
+  // --retier judges again what is already queued but was judged before tiers existed.
+  const queue = has('retier') ? store.queue(10_000).filter((r) => !r.tier).slice(0, limit).map(rehydrate)
+    : store.unjudged(limit, flag('id'));
   if (!queue.length) { console.log('Nothing left to judge.'); store.close(); return; }
   const prof = profile();
   const model = flag('model');
@@ -266,13 +268,26 @@ function cmdReport(): void {
 /** What to apply to next: the best judged postings not yet applied to. */
 function cmdQueue(): void {
   const store = new Store(DB_PATH);
-  const rows = store.queue(Number(flag('limit', '5')));
-  if (!rows.length) { console.log('Queue is empty. Poll, screen and judge to fill it.'); store.close(); return; }
-  for (const [i, r] of rows.entries()) {
-    console.log(`${i + 1}. ${r.score ?? '?'}/5 ${r.rating.padEnd(6)} ${r.company} — ${r.title}`);
-    console.log(`   ${money(r.salary_min)}–${money(r.salary_max)} · ${r.remote_truth ?? 'remote?'} · ${r.ats} · ${r.id}`);
-    console.log(`   ${r.url}`);
+  const limit = Number(flag('limit', '5'));
+  const show = (rows: Record<string, any>[]) => {
+    for (const [i, r] of rows.entries()) {
+      const pay = r.salary_min || r.salary_max ? `${money(r.salary_min)}–${money(r.salary_max)}` : r.est_pay ? `~${money(r.est_pay)} est.` : 'pay not stated';
+      console.log(`${i + 1}. ${r.score ?? '?'}/5 ${r.rating.padEnd(6)} ${r.company} — ${r.title}`);
+      console.log(`   ${pay} · ${r.remote_truth ?? 'remote?'} · ${r.ats} · ${r.id}`);
+      console.log(`   ${r.url}`);
+    }
+  };
+  // Three buckets by reach and pay; --tier narrows to one, --all ignores tiers.
+  const tiers: [string, string][] = [['75k', 'Qualified now (~$75–95k)'], ['100k', 'Realistic target (~$95–125k)'], ['stretch', 'Stretch ($125k+ or asks past you)']];
+  const only = flag('tier');
+  if (has('all')) show(store.queue(limit));
+  else for (const [t, label] of tiers.filter(([t]) => !only || t === only)) {
+    const rows = store.queue(limit, t);
+    console.log(`\n== ${label}`);
+    rows.length ? show(rows) : console.log('   (none yet; judge more to fill it)');
   }
+  const untiered = store.queue(1000).filter((r) => !r.tier).length;
+  if (untiered && !only) console.log(`\n${untiered} queued postings were judged before tiers existed; \`jobpipe judge --retier\` sorts them.`);
   store.close();
 }
 
@@ -458,8 +473,8 @@ async function cmdAutoapply(): Promise<void> {
   const tried = new Set(store.query('SELECT posting_id, employer_posting_id FROM auto_attempts')
     .flatMap((r) => [r.posting_id, r.employer_posting_id]).filter(Boolean));
   const only = flag('id');
-  const candidates = store.queue(200).filter((r) => (only ? r.id === only
-    : r.score >= 4 && r.ghost_risk === 'low' && r.remote_truth === 'us-remote' && !tried.has(r.id)));
+  const candidates = only ? store.queue(10_000).filter((r) => r.id === only)
+    : mixTiers(store.queue(1000).filter((r) => inLane(r) && !tried.has(r.id)));
   if (!candidates.length) { console.log('Nothing in the queue fits the automatic lane.'); store.close(); return; }
 
   const digest = join(OUT, `auto-${today}${dryRun ? '-dry-run' : ''}.md`);
@@ -636,6 +651,7 @@ if (!command || !COMMANDS[command]) {
   jobpipe verify  [--bulk] [--ats A]               check every board still answers
   jobpipe tailor  <posting-id> [--track frontend|marketing]   set up the application folder
   jobpipe build   <posting-id>                     render the resume, check one page + tailored
+  jobpipe judge --retier [--limit N]             re-judge queued postings judged before tiers existed
   jobpipe autoapply [--limit 10] [--dry-run] [--id P]  tailor, fill and submit within the lane, unattended
   jobpipe ready                                     prepared Greenhouse applications waiting for you (it emails a code)
   jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT] [--status S]

@@ -80,11 +80,16 @@ ${p.description.slice(0, DESCRIPTION_CHARS)}
 1. Remote truth. Job boards label roles "remote" that are not. Read the whole description for on-site days, relocation, a required metro, a state list, or timezone limits. A candidate fails a state list that leaves out the state they live in (from the background). Quote the words that decide it.
 2. Ghost risk. A posting that is very old, no longer listed, reposted again and again, or written so generically that no team could be behind it is likely not being hired for.
 3. Title leverage. The same skills are often paid very differently depending on the title. Score how far this title moves the candidate toward the best-paid titles their background fits; the background may name them.
+4. Tier. Put the posting in one bucket by how likely this candidate gets an interview and what it pays (use the stated pay; when none is stated, estimate base pay from the title, level and company):
+   - "75k": the candidate meets the stated requirements now; base pay around $75–95k.
+   - "100k": the candidate meets most requirements (at most one real gap); base pay around $95–125k.
+   - "stretch": asks well past the candidate (years well beyond theirs, or a core tool they have never used), or pays above $125k with any level gap.
+   Use the requirements as written: "5+ years" against ~3 is a stretch whatever the pay.
 
 ## Your answer
 Reply with ONE JSON object and nothing else. No markdown fence, no commentary.
 
-{"rating":"STRONG|FAIR|WEAK|NO","score":1,"subscores":{"role_fit":1,"level":1,"pay":1,"remote":1,"title_leverage":1},"remote_truth":"us-remote|state-restricted|hybrid-or-onsite|non-us|unclear","remote_evidence":"the deciding words, quoted","ghost_risk":"low|medium|high","ghost_signals":["short phrases, [] if none"],"reasoning":"one or two sentences quoting the posting where it matters","blockers":["short phrases naming anything that would block an application, [] if none"]}
+{"rating":"STRONG|FAIR|WEAK|NO","score":1,"subscores":{"role_fit":1,"level":1,"pay":1,"remote":1,"title_leverage":1},"remote_truth":"us-remote|state-restricted|hybrid-or-onsite|non-us|unclear","remote_evidence":"the deciding words, quoted","ghost_risk":"low|medium|high","ghost_signals":["short phrases, [] if none"],"reasoning":"one or two sentences quoting the posting where it matters","blockers":["short phrases naming anything that would block an application, [] if none"],"tier":"75k|100k|stretch","est_pay":95000}
 
 Scores are 1–5, 5 best. "pay" is 3 when pay is not stated. "score" is your overall call, not an average.
 
@@ -120,6 +125,7 @@ const RATINGS = new Set(['STRONG', 'FAIR', 'WEAK', 'NO']);
 
 const REMOTE_TRUTH = new Set(['us-remote', 'state-restricted', 'hybrid-or-onsite', 'non-us', 'unclear']);
 const GHOST = new Set(['low', 'medium', 'high']);
+const TIERS = new Set(['75k', '100k', 'stretch']);
 const clamp = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : null; };
 
 export async function judgePosting(
@@ -152,6 +158,8 @@ export async function judgePosting(
       remoteEvidence: String(parsed.remote_evidence ?? '').trim(),
       ghostRisk: GHOST.has(parsed.ghost_risk) ? parsed.ghost_risk : null,
       ghostSignals: Array.isArray(parsed.ghost_signals) ? parsed.ghost_signals.map(String) : [],
+      tier: TIERS.has(parsed.tier) ? parsed.tier : null,
+      estPay: Number.isFinite(Number(parsed.est_pay)) && Number(parsed.est_pay) > 1000 ? Math.round(Number(parsed.est_pay)) : null,
       judgedAt: new Date().toISOString(),
       model,
     };
