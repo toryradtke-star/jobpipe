@@ -328,14 +328,14 @@ export class Store {
       LEFT JOIN screens s ON s.posting_id = p.id WHERE s.posting_id IS NULL`);
   }
 
-  /** Postings that passed the screen and have not been judged. */
-  unjudged(limit: number): Posting[] {
+  /** Postings that passed the screen and have not been judged; `id` narrows it to one. */
+  unjudged(limit: number, id?: string): Posting[] {
     return this.rows(`SELECT p.* FROM postings p
       JOIN screens s ON s.posting_id = p.id AND s.verdict = 'pass'
       LEFT JOIN judgments j ON j.posting_id = p.id
-      WHERE j.posting_id IS NULL
+      WHERE j.posting_id IS NULL AND (? IS NULL OR p.id = ?)
       ORDER BY COALESCE(p.posted_at, p.first_seen) DESC
-      LIMIT ?`, limit);
+      LIMIT ?`, id ?? null, id ?? null, limit);
   }
 
   private rows(sql: string, ...params: unknown[]): Posting[] {

@@ -19,6 +19,17 @@ test('a sentence-opening word whose stem is known passes', () => {
   assert.deepEqual(factCheck(tailored, MASTER, ''), []);
 });
 
+test('slash-joined known tools and a sentence-opening common word pass', () => {
+  const tailored = swap('Web developer who ships', 'Outside work, a JavaScript/Next.js web developer who ships');
+  assert.deepEqual(factCheck(tailored, MASTER, ''), []);
+});
+
+test('a new tool is still caught when it opens a sentence or hides behind a slash', () => {
+  const problems = factCheck(swap('Web developer who ships', 'Salesforce admin and Kotlin/JavaScript web developer who ships'), MASTER, '').join();
+  assert.match(problems, /salesforce/);
+  assert.match(problems, /kotlin/);
+});
+
 test('a new number is caught', () => {
   const tailored = swap('rose from ~300K to 5.9M', 'rose from ~300K to 9.2M');
   assert.match(factCheck(tailored, MASTER, '').join(), /9\.2m/);

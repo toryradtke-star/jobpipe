@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 /**
  * Applying without Tory at the keyboard.
  *
@@ -92,6 +93,23 @@ const MANAGED_SPEND = /\b(manag|own|oversaw|oversee|controll?|direct|allocat)\w*
  * What is wrong with a tailored resume, judged against everything Tory has
  * written down about themselves. Empty means it only rephrases.
  */
+/** Lowercase dictionary words from the system word list; empty where there is none. */
+let words: Set<string> | undefined;
+function englishWords(): Set<string> {
+  if (words) return words;
+  try {
+    words = new Set(readFileSync('/usr/share/dict/words', 'utf8').split('\n').filter((w) => /^[a-z]+$/.test(w)));
+  } catch { words = new Set(); }
+  return words;
+}
+
+/** True when every appearance of the word is capitalised at the start of a sentence, bullet or line. */
+function opensSentencesOnly(text: string, word: string): boolean {
+  const hits = [...text.matchAll(new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'))];
+  return hits.length > 0 && hits.every((m) => /^[A-Z]/.test(m[0])
+    && /(^|\n)\s*([-*]\s+)?(\*\*)?$|[.!?:]\s+$/.test(text.slice(Math.max(0, m.index! - 6), m.index)));
+}
+
 export function factCheck(tailored: string, master: string, corpus: string): string[] {
   const problems: string[] = [];
   const front = (s: string) => /^---[\s\S]*?\n---\n/.exec(s)?.[0] ?? '';
@@ -101,7 +119,12 @@ export function factCheck(tailored: string, master: string, corpus: string): str
   // A word is known when its stem is: "Marketer" opening a sentence is fine
   // when the master says "marketing"; "Salesforce" is not, from anything.
   const stem = (t: string) => (/^[a-z]{7,}$/.test(t) ? t.slice(0, 6) : t);
-  const fresh = [...factTokens(tailored)].filter((t) => !known.has(t) && !knownText.includes(stem(t)));
+  const isKnown = (t: string): boolean => known.has(t) || knownText.includes(stem(t))
+    // "TypeScript/SQLite" is two known things, not one new one.
+    || (t.includes('/') && t.split('/').every((part) => part !== '' && isKnown(part)))
+    // An ordinary word capitalised only because it opens a sentence ("Outside the day job").
+    || (englishWords().has(t) && opensSentencesOnly(tailored, t));
+  const fresh = [...factTokens(tailored)].filter((t) => !isKnown(t));
   if (fresh.length) problems.push(`facts not in the source documents: ${fresh.slice(0, 12).join(', ')}`);
   // Line by line: the master's own "accounts running ~$50K/month in spend" matches too.
   const masterLines = new Set(master.split('\n').map((l) => l.trim()));
@@ -153,7 +176,7 @@ Application page: ${o.url}
 Resume PDF to upload (the only file you may attach): ${o.pdf}
 
 ## Hard stops — report status "skipped" and do not submit if any is true
-- The page is not on job-boards.greenhouse.io, boards.greenhouse.io, jobs.lever.co or jobs.ashbyhq.com (check after every navigation), or the posting is closed, or it is a different role.
+- The page is not on job-boards.greenhouse.io, boards.greenhouse.io, jobs.lever.co or jobs.ashbyhq.com, or the .eu. version of one of those (check after every navigation), or the posting is closed, or it is a different role.
 - The form asks you to create an account, sign in, or enter a password.
 - A CAPTCHA or bot check appears that is not passed automatically.
 - It asks for SSN, government ID, date of birth, bank or card details.

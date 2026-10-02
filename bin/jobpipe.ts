@@ -184,7 +184,7 @@ function rehydrate(r: Record<string, any>): Posting {
 async function cmdJudge(): Promise<void> {
   const store = new Store(DB_PATH);
   const limit = Number(flag('limit', '20'));
-  const queue = store.unjudged(limit);
+  const queue = store.unjudged(limit, flag('id'));
   if (!queue.length) { console.log('Nothing left to judge.'); store.close(); return; }
   const prof = profile();
   const model = flag('model');
@@ -509,8 +509,12 @@ async function cmdAutoapply(): Promise<void> {
       `- Location: ${emp.location ?? 'not stated'}`, `- Pay: ${money(p.salary_min)}–${money(p.salary_max)}`, `- Track: ${track}`,
       '', `## Judge's read\n\n${p.reasoning}${blockers.length ? `\n\nGaps: ${blockers.join('; ')}` : ''}`, '', '## Description', '', p.description].join('\n');
     writeFileSync(join(dir, 'posting.md'), postingMd);
-    if (!existsSync(join(dir, 'resume.md'))) copyFileSync(master, join(dir, 'resume.md'));
-    writeFileSync(join(dir, '.jobpipe.json'), JSON.stringify({ postingId: c.id, employerPostingId: emp.id, track, master, auto: true }, null, 2));
+    // A resume.md left by an earlier automatic or dry run was tailored from whatever the master was
+    // then; start again from today's. One a person tailored by hand (no auto flag) is kept.
+    const metaPath = join(dir, '.jobpipe.json');
+    const leftByMachine = existsSync(metaPath) && JSON.parse(readFileSync(metaPath, 'utf8')).auto === true;
+    if (!existsSync(join(dir, 'resume.md')) || leftByMachine) copyFileSync(master, join(dir, 'resume.md'));
+    writeFileSync(metaPath, JSON.stringify({ postingId: c.id, employerPostingId: emp.id, track, master, auto: true }, null, 2));
     const masterText = readFileSync(master, 'utf8');
     try {
       if (readFileSync(join(dir, 'resume.md'), 'utf8') === masterText) {
@@ -601,7 +605,7 @@ if (!command || !COMMANDS[command]) {
   jobpipe poll    [--bulk] [--scrape] [--ats workday] [--tag saas] [--concurrency 4]
                                                    fetch every board, store what is new
   jobpipe screen  [--all]                          apply the deterministic rule-outs
-  jobpipe judge   [--limit 20] [--model NAME]      send survivors to Claude
+  jobpipe judge   [--limit 20] [--model NAME] [--id P]  send survivors to Claude
   jobpipe report  [--out PATH]                     write the triage markdown
   jobpipe queue   [--limit 5]                      best judged postings not yet applied to
   jobpipe stats                                    what the store holds
