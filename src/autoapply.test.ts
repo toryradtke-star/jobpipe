@@ -30,6 +30,11 @@ test('a new tool is still caught when it opens a sentence or hides behind a slas
   assert.match(problems, /kotlin/);
 });
 
+test('a known term joined to an ordinary word passes; joined to a new tool it is caught', () => {
+  assert.deepEqual(factCheck(swap('Web developer who ships', 'Next.js-minded web developer who ships'), MASTER, ''), []);
+  assert.match(factCheck(swap('Web developer who ships', 'Salesforce-certified web developer who ships'), MASTER, '').join(), /salesforce/);
+});
+
 test('a new number is caught', () => {
   const tailored = swap('rose from ~300K to 5.9M', 'rose from ~300K to 9.2M');
   assert.match(factCheck(tailored, MASTER, '').join(), /9\.2m/);

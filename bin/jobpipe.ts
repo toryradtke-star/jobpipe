@@ -13,6 +13,7 @@
  *   queue    the next few postings worth applying to
  *   stats    what the store holds right now
  *   autoapply   tailor, fill and submit the best queued postings, unattended
+ *   ready       Greenhouse applications prepared and waiting for you to submit
  *   applied     record an application against a posting
  *   import-csv  load the tracker CSV into the store
  *   export-csv  write the store's applications back out as that CSV
@@ -526,6 +527,14 @@ async function cmdAutoapply(): Promise<void> {
     try { built = buildResume(p); problems.push(...built.problems); } catch (e: any) { problems.push(`build failed: ${String(e.message ?? e).slice(0, 120)}`); }
     if (problems.length) { record(c.id, 'tailor-failed', problems.join('; '), emp.id, dir); log([`## ✗ ${c.company} — ${c.title}`, `Resume rejected: ${problems.join('; ')}. Left in ${dir} for you.`]); continue; }
 
+    // Greenhouse emails a security code after Submit, which only a person can enter. Stop here
+    // with everything ready; `jobpipe ready` lists these for a session with Tory at the keyboard.
+    if (emp.ats === 'greenhouse' && !dryRun) {
+      record(c.id, 'needs-you', `resume ready: ${built!.pdf}`, emp.id, dir);
+      log([`## → ${c.company} — ${c.title}`, `Ready for you (Greenhouse asks for an emailed code). ${url}`, `Resume: ${built!.pdf}`]);
+      continue;
+    }
+
     // 3. Fill and submit, in a headless browser of its own.
     const mcp = join(dir, 'browser', 'mcp.json');
     writeFileSync(mcp, JSON.stringify({ mcpServers: { pw: { command: 'npx', args: ['-y', '@playwright/mcp@0.0.83', '--browser', 'chrome',
@@ -569,6 +578,21 @@ async function cmdAutoapply(): Promise<void> {
   store.close();
 }
 
+/** Applications the automatic run prepared but left for a person to submit, oldest first. */
+function cmdReady(): void {
+  const store = new Store(DB_PATH);
+  const rows = store.query(`SELECT a.posting_id, a.employer_posting_id, a.attempted_at, a.detail, a.folder, p.company, p.title, e.ats, e.slug, e.external_id, e.url
+    FROM auto_attempts a JOIN postings p ON p.id = a.posting_id LEFT JOIN postings e ON e.id = a.employer_posting_id
+    WHERE a.outcome = 'needs-you' AND NOT EXISTS (SELECT 1 FROM applications x WHERE x.posting_id IN (a.posting_id, a.employer_posting_id)
+      OR (x.company = p.company AND x.role = p.title)) ORDER BY a.attempted_at`);
+  if (!rows.length) console.log('Nothing waiting for you.');
+  for (const r of rows) {
+    const url = r.ats ? applyUrl({ ats: r.ats, slug: r.slug, externalId: r.external_id, url: r.url }) : null;
+    console.log(`${r.company} — ${r.title}\n  ${url ?? '(no apply url)'}\n  ${r.detail}\n  record: ./bin/jobpipe.ts applied ${r.employer_posting_id ?? r.posting_id} --resume <pdf> --confirm <text>\n`);
+  }
+  store.close();
+}
+
 /** Starter profile files for a new user; never overwrites one that exists. */
 function cmdInit() {
   const starters: Record<string, string> = {
@@ -594,7 +618,7 @@ master-frontend.md, master-marketing.md and a build.py (markdown → one-page PD
 const COMMANDS: Record<string, () => void | Promise<void>> = {
   init: cmdInit, verify: cmdVerify, poll: cmdPoll, screen: cmdScreen,
   judge: cmdJudge, report: cmdReport, stats: cmdStats,
-  queue: cmdQueue, tailor: cmdTailor, build: cmdBuild, autoapply: cmdAutoapply, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
+  queue: cmdQueue, tailor: cmdTailor, build: cmdBuild, autoapply: cmdAutoapply, ready: cmdReady, applied: cmdApplied, 'import-csv': cmdImportCsv, 'export-csv': cmdExportCsv,
 };
 
 const command = process.argv[2];
@@ -613,6 +637,7 @@ if (!command || !COMMANDS[command]) {
   jobpipe tailor  <posting-id> [--track frontend|marketing]   set up the application folder
   jobpipe build   <posting-id>                     render the resume, check one page + tailored
   jobpipe autoapply [--limit 10] [--dry-run] [--id P]  tailor, fill and submit within the lane, unattended
+  jobpipe ready                                     prepared Greenhouse applications waiting for you (it emails a code)
   jobpipe applied <posting-id> [--resume PATH] [--confirm URL] [--notes TEXT] [--status S]
   jobpipe import-csv [--from PATH]                 load the tracker CSV into the store
   jobpipe export-csv [--out PATH]                  write applications back out as CSV

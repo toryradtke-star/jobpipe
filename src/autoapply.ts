@@ -122,6 +122,8 @@ export function factCheck(tailored: string, master: string, corpus: string): str
   const isKnown = (t: string): boolean => known.has(t) || knownText.includes(stem(t))
     // "TypeScript/SQLite" is two known things, not one new one.
     || (t.includes('/') && t.split('/').every((part) => part !== '' && isKnown(part)))
+    // "GTM-minded" is a known thing plus an ordinary word; "Salesforce-certified" is still new.
+    || (t.includes('-') && t.split('-').every((part) => part !== '' && (isKnown(part) || englishWords().has(part))))
     // An ordinary word capitalised only because it opens a sentence ("Outside the day job").
     || (englishWords().has(t) && opensSentencesOnly(tailored, t));
   const fresh = [...factTokens(tailored)].filter((t) => !isKnown(t));
