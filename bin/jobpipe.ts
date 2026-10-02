@@ -120,18 +120,18 @@ async function cmdPoll(): Promise<void> {
   console.log(`Polling ${list.length} boards…`);
   let ok = 0, failed = 0, seen = 0, added = 0;
   const errors: string[] = [];
-  const results = await fetchAll(list, {
+  // Each board is saved as it answers, so a long pull stopped partway keeps what it found.
+  await fetchAll(list, {
     concurrency: Number(flag('concurrency', '4')),
     onResult: (r) => {
-      if (r.ok) { ok++; } else { failed++; errors.push(`${r.company.ats}:${r.company.slug} ${r.error}`); }
+      if (r.ok) {
+        ok++;
+        const n = store.upsertPostings(r.postings);
+        seen += n.seen; added += n.added;
+      } else { failed++; errors.push(`${r.company.ats}:${r.company.slug} ${r.error}`); }
       if (list.length > 200 && (ok + failed) % 200 === 0) console.log(`  ${ok + failed}/${list.length} boards…`);
     },
   });
-  for (const r of results) {
-    if (!r.ok) continue;
-    const n = store.upsertPostings(r.postings);
-    seen += n.seen; added += n.added;
-  }
   store.db.prepare(`INSERT INTO polls (started_at, finished_at, boards_ok, boards_failed, postings_seen, postings_new, errors)
     VALUES (?,?,?,?,?,?,?)`).run(startedAt, new Date().toISOString(), ok, failed, seen, added, JSON.stringify(errors));
   console.log(`${ok}/${list.length} boards answered. ${seen} postings seen, ${added} new.`);
